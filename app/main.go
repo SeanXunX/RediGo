@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 )
 
 // Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
@@ -31,23 +35,62 @@ func main() {
 	}
 }
 
+func parseRespArray(reader *bufio.Reader) ([]string, error) {
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasPrefix(line, "*") {
+		return nil, fmt.Errorf("Invalid array start: %s", line)
+	}
+
+	count, err := strconv.Atoi(strings.TrimSpace(line[1:]))
+	if err != nil {
+		return nil, fmt.Errorf("Invalid array length: %v", err)
+	}
+
+	var parts []string = make([]string, count)
+	for i := range parts {
+		// string elem
+		lenLine, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		if !strings.HasPrefix(lenLine, "$") {
+			return nil, fmt.Errorf("Invalid bulk string header: %s", lenLine)
+		}
+
+		_, err = strconv.Atoi(strings.TrimSpace(lenLine[1:]))
+		if err != nil {
+			return nil, err
+		}
+
+		str, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+
+		parts[i] = strings.TrimSpace(str)
+
+	}
+	return parts, nil
+}
+
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	buf := make([]byte, 1024)
+	reader := bufio.NewReader(conn)
 	for {
-		_, err := conn.Read(buf)
+		cmd, err := parseRespArray(reader)
+		if err == io.EOF {
+			return
+		}
 		if err != nil {
-			fmt.Println("Error reading request: ", err.Error())
+			fmt.Println("Error parsing array", err.Error())
+			return
 		}
 
-		for _, ch := range string(buf) {
-			if ch == '*' {
-				_, err = conn.Write([]byte("+PONG\r\n"))
-				if err != nil {
-					fmt.Println("Error writing response: ", err.Error())
-				}
-			}
+		if len(cmd) > 0 && strings.ToLower(cmd[0]) == "echo" {
+			fmt.Fprintf(conn, "+%s\r\n", cmd[1])
 		}
-
 	}
 }
