@@ -10,10 +10,6 @@ import (
 	"strings"
 )
 
-// Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
-var _ = net.Listen
-var _ = os.Exit
-
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
@@ -80,17 +76,35 @@ func handleConnection(conn net.Conn) {
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
 	for {
-		cmd, err := parseRespArray(reader)
+		b, err := reader.Peek(1)
 		if err == io.EOF {
 			return
 		}
 		if err != nil {
-			fmt.Println("Error parsing array", err.Error())
+			fmt.Println("Error peeking the first byte: ", err.Error())
 			return
 		}
 
-		if len(cmd) > 0 && strings.ToLower(cmd[0]) == "echo" {
-			fmt.Fprintf(conn, "+%s\r\n", cmd[1])
+		switch b[0] {
+		case '*':
+			// handle array
+			cmd, err := parseRespArray(reader)
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				fmt.Println("Error parsing array", err.Error())
+				return
+			}
+
+			if len(cmd) > 0 && strings.ToLower(cmd[0]) == "echo" {
+				fmt.Fprintf(conn, "+%s\r\n", cmd[1])
+			} else if strings.ToLower(cmd[0]) == "ping" {
+				fmt.Fprintf(conn, "+PONG\r\n")
+			}
+		default:
+			return
 		}
+
 	}
 }
