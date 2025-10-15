@@ -32,8 +32,22 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-	_, err := conn.Write([]byte("+PONG\r\n"))
-	if err != nil {
-		fmt.Println("Error writing response: ", err.Error())
+	defer conn.Close()
+	buf := make([]byte, 1024)
+	for {
+		_, err := conn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading request: ", err.Error())
+		}
+
+		for _, ch := range string(buf) {
+			if ch == '*' {
+				_, err = conn.Write([]byte("+PONG\r\n"))
+				if err != nil {
+					fmt.Println("Error writing response: ", err.Error())
+				}
+			}
+		}
+
 	}
 }
