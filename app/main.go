@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io"
+	"github.com/codecrafters-io/redis-starter-go/app/handler"
 	"net"
 	"os"
-	"strconv"
-	"strings"
 )
 
 func main() {
@@ -27,84 +24,8 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleConnection(conn)
-	}
-}
 
-func parseRespArray(reader *bufio.Reader) ([]string, error) {
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
-	if !strings.HasPrefix(line, "*") {
-		return nil, fmt.Errorf("Invalid array start: %s", line)
-	}
-
-	count, err := strconv.Atoi(strings.TrimSpace(line[1:]))
-	if err != nil {
-		return nil, fmt.Errorf("Invalid array length: %v", err)
-	}
-
-	var parts []string = make([]string, count)
-	for i := range parts {
-		// string elem
-		lenLine, err := reader.ReadString('\n')
-		if err != nil {
-			return nil, err
-		}
-		if !strings.HasPrefix(lenLine, "$") {
-			return nil, fmt.Errorf("Invalid bulk string header: %s", lenLine)
-		}
-
-		_, err = strconv.Atoi(strings.TrimSpace(lenLine[1:]))
-		if err != nil {
-			return nil, err
-		}
-
-		str, err := reader.ReadString('\n')
-		if err != nil {
-			return nil, err
-		}
-
-		parts[i] = strings.TrimSpace(str)
-
-	}
-	return parts, nil
-}
-
-func handleConnection(conn net.Conn) {
-	defer conn.Close()
-	reader := bufio.NewReader(conn)
-	for {
-		b, err := reader.Peek(1)
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			fmt.Println("Error peeking the first byte: ", err.Error())
-			return
-		}
-
-		switch b[0] {
-		case '*':
-			// handle array
-			cmd, err := parseRespArray(reader)
-			if err == io.EOF {
-				return
-			}
-			if err != nil {
-				fmt.Println("Error parsing array", err.Error())
-				return
-			}
-
-			if len(cmd) > 0 && strings.ToLower(cmd[0]) == "echo" {
-				fmt.Fprintf(conn, "+%s\r\n", cmd[1])
-			} else if strings.ToLower(cmd[0]) == "ping" {
-				fmt.Fprintf(conn, "+PONG\r\n")
-			}
-		default:
-			return
-		}
-
+		h := handler.NewConnHandler(conn)
+		go h.Handle()
 	}
 }
