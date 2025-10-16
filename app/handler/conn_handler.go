@@ -3,15 +3,20 @@ package handler
 import (
 	"bufio"
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/kv"
 	"io"
 	"log"
 	"net"
 	"strconv"
 	"strings"
-	"sync"
+	"time"
 )
 
-var DB sync.Map
+type valueWithExpireTime struct {
+	val       string
+	createdAt time.Time
+	px        int
+}
 
 type ConnHandler struct {
 	conn net.Conn
@@ -46,13 +51,21 @@ func (h *ConnHandler) Handle() {
 		case "ECHO":
 			fmt.Fprintf(h.conn, "$%d\r\n%s\r\n", len(cmd.Args[0]), cmd.Args[0])
 		case "SET":
-			key, val := cmd.Args[0], cmd.Args[1]
-			DB.Store(key, val)
+			key, value := cmd.Args[0], cmd.Args[1]
+			if len(cmd.Args) == 2 {
+				kv.Set(key, value)
+			} else if len(cmd.Args) == 4 {
+				t, _ := strconv.Atoi(cmd.Args[3])
+				if cmd.Args[2] == "EX" {
+					t *= 1000
+				}
+				kv.SetExpire(key, value, t)
+			}
 			fmt.Fprint(h.conn, "+OK\r\n")
 		case "GET":
 			key := cmd.Args[0]
-			val, ok := DB.Load(key)
-			if ok {
+			val := kv.Get(key)
+			if val != nil {
 				fmt.Fprintf(h.conn, "$%d\r\n%s\r\n", len(val.(string)), val.(string))
 			} else {
 				fmt.Fprint(h.conn, "$-1\r\n")
