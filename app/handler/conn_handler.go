@@ -56,7 +56,7 @@ func (h *ConnHandler) Handle() {
 				kv.Set(key, value)
 			} else if len(cmd.Args) == 4 {
 				t, _ := strconv.Atoi(cmd.Args[3])
-				if cmd.Args[2] == "EX" {
+				if strings.ToUpper(cmd.Args[2]) == "EX" {
 					t *= 1000
 				}
 				kv.SetExpire(key, value, t)
