@@ -7,14 +7,16 @@ import (
 
 var KVStore sync.Map
 
-type StoreValue struct {
+type SetValue struct {
 	value     string
 	px        int
 	createdAt time.Time
 }
 
+type ListValue []string
+
 func Set(key, value string) {
-	v := StoreValue{
+	v := SetValue{
 		value:     value,
 		px:        -1,
 		createdAt: time.Now(),
@@ -23,7 +25,7 @@ func Set(key, value string) {
 }
 
 func SetExpire(key, value string, t int) {
-	v := StoreValue{
+	v := SetValue{
 		value:     value,
 		px:        t,
 		createdAt: time.Now()}
@@ -35,7 +37,7 @@ func Get(key string) (value any) {
 	if !ok {
 		return nil
 	} else {
-		v := v.(StoreValue)
+		v := v.(SetValue)
 		if v.px == -1 {
 			return v.value
 		} else {
@@ -48,4 +50,17 @@ func Get(key string) (value any) {
 			}
 		}
 	}
+}
+
+func RPush(key string, value []string) int {
+	oldTarList, ok := KVStore.Load(key)
+	var newTarList ListValue
+	if !ok {
+		newTarList = ListValue{}
+	} else {
+		newTarList = oldTarList.(ListValue)
+	}
+	newTarList = append(newTarList, value...)
+	KVStore.Store(key, newTarList)
+	return len(value)
 }

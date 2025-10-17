@@ -4,19 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"io"
 	"log"
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
-
-type valueWithExpireTime struct {
-	val       string
-	createdAt time.Time
-	px        int
-}
 
 type ConnHandler struct {
 	conn net.Conn
@@ -70,6 +64,11 @@ func (h *ConnHandler) Handle() {
 			} else {
 				fmt.Fprint(h.conn, "$-1\r\n")
 			}
+		case "RPUSH":
+			key := cmd.Args[0]
+			value := cmd.Args[1:]
+			length := kv.RPush(key, value)
+			h.conn.Write(resp.EncodeInt(length))
 		}
 	}
 
@@ -78,54 +77,14 @@ func (h *ConnHandler) Handle() {
 func (h *ConnHandler) readCMD() {
 	reader := bufio.NewReader(h.conn)
 	for {
-		numberLine, err := reader.ReadString('\n')
+		parts, err := resp.DecodeArray(reader)
 		if err == io.EOF {
 			log.Println("Client closed connection")
 			return
-		}
-		if err != nil {
-			log.Printf("Error reading numberLine: %s\n", err.Error())
+		} else if err != nil {
+			log.Println(err.Error())
 			continue
 		}
-		if !strings.HasPrefix(numberLine, "*") {
-			log.Printf("Missing * as the first byte. Received: %s\n", numberLine)
-			continue
-		}
-
-		count, err := strconv.Atoi(strings.TrimSpace(numberLine[1:]))
-		if err != nil {
-			log.Println("Invalid array length. Error: ", err.Error())
-			continue
-		}
-
-		var parts []string = make([]string, count)
-		for i := range parts {
-			lenLine, err := reader.ReadString('\n')
-			if err != nil {
-				log.Println(err.Error())
-				continue
-			}
-
-			if !strings.HasPrefix(lenLine, "$") {
-				log.Println("Missing $ as the first byte. Received: ", lenLine)
-				continue
-			}
-
-			_, err = strconv.Atoi(strings.TrimSpace(lenLine[1:]))
-			if err != nil {
-				log.Println(err.Error())
-				continue
-			}
-
-			str, err := reader.ReadString('\n')
-			if err != nil {
-				log.Println(err.Error())
-				continue
-			}
-
-			parts[i] = strings.TrimSpace(str)
-		}
-
 		cmd := CMD{}
 		if len(parts) > 0 {
 			cmd.Command = parts[0]
