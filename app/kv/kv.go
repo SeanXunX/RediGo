@@ -62,5 +62,5 @@ func RPush(key string, value []string) int {
 	}
 	newTarList = append(newTarList, value...)
 	KVStore.Store(key, newTarList)
-	return len(value)
+	return len(newTarList)
 }
