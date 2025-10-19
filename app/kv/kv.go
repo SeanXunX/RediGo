@@ -73,7 +73,13 @@ func LRange(key string, start, stop int) ListValue {
 	} else {
 		tarList := tarListAny.(ListValue)
 		length := len(tarList)
-		if start >= length {
+		if start < 0 {
+			start = length + start
+		}
+		if stop < 0 {
+			stop = length + stop
+		}
+		if start >= length || start > stop {
 			return res
 		}
 		if stop >= length {
