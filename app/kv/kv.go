@@ -107,3 +107,13 @@ func LRange(key string, start, stop int) ListValue {
 	}
 	return res
 }
+
+func LLen(key string) int {
+	tarListAny, ok := KVStore.Load(key)
+	if !ok {
+		return 0
+	} else {
+		tarList := tarListAny.(ListValue)
+		return len(tarList)
+	}
+}

@@ -80,6 +80,10 @@ func (h *ConnHandler) Handle() {
 			stop, _ := strconv.Atoi(cmd.Args[2])
 			l := kv.LRange(key, start, stop)
 			h.conn.Write(resp.EncodeArray(l))
+		case "LLEN":
+			key := cmd.Args[0]
+			length := kv.LLen(key)
+			h.conn.Write(resp.EncodeInt(length))
 		}
 	}
 
