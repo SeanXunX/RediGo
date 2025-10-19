@@ -65,6 +65,19 @@ func RPush(key string, value []string) int {
 	return len(newTarList)
 }
 
+func LPush(key string, value []string) int {
+	oldTarList, ok := KVStore.Load(key)
+	var newTarList ListValue
+	if !ok {
+		newTarList = ListValue{}
+	} else {
+		newTarList = oldTarList.(ListValue)
+	}
+	newTarList = append(value, newTarList...)
+	KVStore.Store(key, newTarList)
+	return len(newTarList)
+}
+
 func LRange(key string, start, stop int) ListValue {
 	res := ListValue{}
 	tarListAny, ok := KVStore.Load(key)
