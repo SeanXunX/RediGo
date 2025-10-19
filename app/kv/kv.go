@@ -64,3 +64,22 @@ func RPush(key string, value []string) int {
 	KVStore.Store(key, newTarList)
 	return len(newTarList)
 }
+
+func LRange(key string, start, stop int) ListValue {
+	res := ListValue{}
+	tarListAny, ok := KVStore.Load(key)
+	if !ok {
+		return res
+	} else {
+		tarList := tarListAny.(ListValue)
+		length := len(tarList)
+		if start >= length {
+			return res
+		}
+		if stop >= length {
+			stop = length - 1
+		}
+		res = tarListAny.(ListValue)[start : stop+1]
+	}
+	return res
+}
