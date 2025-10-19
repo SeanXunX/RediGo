@@ -69,6 +69,11 @@ func (h *ConnHandler) Handle() {
 			value := cmd.Args[1:]
 			length := kv.RPush(key, value)
 			h.conn.Write(resp.EncodeInt(length))
+		case "LPUSH":
+			key := cmd.Args[0]
+			value := cmd.Args[1:]
+			length := kv.LPush(key, value)
+			h.conn.Write(resp.EncodeInt(length))
 		case "LRANGE":
 			key := cmd.Args[0]
 			start, _ := strconv.Atoi(cmd.Args[1])
