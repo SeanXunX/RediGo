@@ -1,6 +1,7 @@
 package kv
 
 import (
+	"slices"
 	"sync"
 	"time"
 )
@@ -73,6 +74,7 @@ func LPush(key string, value []string) int {
 	} else {
 		newTarList = oldTarList.(ListValue)
 	}
+	slices.Reverse(value)
 	newTarList = append(value, newTarList...)
 	KVStore.Store(key, newTarList)
 	return len(newTarList)
