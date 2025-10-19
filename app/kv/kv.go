@@ -76,10 +76,13 @@ func LRange(key string, start, stop int) ListValue {
 		if start < 0 {
 			start = length + start
 		}
+		if start < 0 {
+			start = 0
+		}
 		if stop < 0 {
 			stop = length + stop
 		}
-		if start >= length || start > stop {
+		if start >= length || start > stop || stop < 0 {
 			return res
 		}
 		if stop >= length {
