@@ -104,7 +104,7 @@ func LRange(key string, start, stop int) ListValue {
 	} else {
 		tarList := tarListAny.(ListValue)
 		length := len(tarList)
-		start, stop = validateRange(start, start, length)
+		start, stop = validateRange(start, stop, length)
 		if start >= length || start > stop || stop < 0 {
 			return res
 		}
