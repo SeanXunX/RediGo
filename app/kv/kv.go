@@ -80,6 +80,22 @@ func LPush(key string, value []string) int {
 	return len(newTarList)
 }
 
+func validateRange(start, stop, length int) (int, int) {
+	if start < 0 {
+		start = length + start
+	}
+	if start < 0 {
+		start = 0
+	}
+	if stop < 0 {
+		stop = length + stop
+	}
+	if stop >= length {
+		stop = length - 1
+	}
+	return start, stop
+}
+
 func LRange(key string, start, stop int) ListValue {
 	res := ListValue{}
 	tarListAny, ok := KVStore.Load(key)
@@ -88,20 +104,9 @@ func LRange(key string, start, stop int) ListValue {
 	} else {
 		tarList := tarListAny.(ListValue)
 		length := len(tarList)
-		if start < 0 {
-			start = length + start
-		}
-		if start < 0 {
-			start = 0
-		}
-		if stop < 0 {
-			stop = length + stop
-		}
+		start, stop = validateRange(start, start, length)
 		if start >= length || start > stop || stop < 0 {
 			return res
-		}
-		if stop >= length {
-			stop = length - 1
 		}
 		res = tarListAny.(ListValue)[start : stop+1]
 	}
@@ -130,6 +135,25 @@ func LPop(key string) any {
 	}
 	res := tarList[0]
 	tarList = tarList[1:]
+	KVStore.Store(key, tarList)
+	return res
+}
+
+func LPopN(key string, num int) []string {
+	tarListAny, ok := KVStore.Load(key)
+	if !ok {
+		return nil
+	}
+	tarList := tarListAny.(ListValue)
+	length := len(tarList)
+	if length == 0 {
+		return nil
+	}
+	if num > length {
+		num = length
+	}
+	res := tarList[:num]
+	tarList = tarList[num:]
 	KVStore.Store(key, tarList)
 	return res
 }

@@ -3,13 +3,14 @@ package handler
 import (
 	"bufio"
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/kv"
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"io"
 	"log"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/codecrafters-io/redis-starter-go/app/kv"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 type ConnHandler struct {
@@ -115,10 +116,25 @@ func (h *ConnHandler) Handle() {
 
 func (h *ConnHandler) handleLPOP(cmd CMD) {
 	key := cmd.Args[0]
-	firstElem := kv.LPop(key)
-	if firstElem == nil {
+	var elem any
+
+	switch len(cmd.Args) {
+	case 1:
+		elem = kv.LPop(key)
+	case 2:
+		num, _ := strconv.Atoi(cmd.Args[1])
+		elem = kv.LPopN(key, num)
+	}
+
+	if elem == nil {
 		h.conn.Write(resp.EncodeNullBulkString())
-	} else {
-		h.conn.Write(resp.EncodeBulkString(firstElem.(string)))
+		return
+	}
+
+	switch v := elem.(type) {
+	case string:
+		h.conn.Write(resp.EncodeBulkString(v))
+	case []string:
+		h.conn.Write(resp.EncodeArray(v))
 	}
 }
