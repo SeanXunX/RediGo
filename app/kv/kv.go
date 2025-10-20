@@ -117,3 +117,19 @@ func LLen(key string) int {
 		return len(tarList)
 	}
 }
+
+func LPop(key string) any {
+	tarListAny, ok := KVStore.Load(key)
+	if !ok {
+		return nil
+	}
+	tarList := tarListAny.(ListValue)
+	length := len(tarList)
+	if length == 0 {
+		return nil
+	}
+	res := tarList[0]
+	tarList = tarList[1:]
+	KVStore.Store(key, tarList)
+	return res
+}

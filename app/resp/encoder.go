@@ -7,6 +7,11 @@ func EncodeInt(num int) (res []byte) {
 	return
 }
 
+func EncodeNullBulkString() (res []byte) {
+	res = fmt.Append(res, "$-1\r\n")
+	return
+}
+
 func EncodeBulkString(str string) (res []byte) {
 	res = fmt.Appendf(res, "$%d\r\n%s\r\n", len(str), str)
 	return

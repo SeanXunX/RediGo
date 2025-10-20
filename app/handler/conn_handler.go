@@ -33,6 +33,28 @@ func (h *ConnHandler) close() {
 	h.conn.Close()
 }
 
+func (h *ConnHandler) readCMD() {
+	reader := bufio.NewReader(h.conn)
+	for {
+		parts, err := resp.DecodeArray(reader)
+		if err == io.EOF {
+			log.Println("Client closed connection")
+			return
+		} else if err != nil {
+			log.Println(err.Error())
+			continue
+		}
+		cmd := CMD{}
+		if len(parts) > 0 {
+			cmd.Command = parts[0]
+			if len(parts) > 1 {
+				cmd.Args = parts[1:]
+			}
+			h.in <- cmd
+		}
+	}
+}
+
 func (h *ConnHandler) Handle() {
 	defer h.close()
 
@@ -84,29 +106,19 @@ func (h *ConnHandler) Handle() {
 			key := cmd.Args[0]
 			length := kv.LLen(key)
 			h.conn.Write(resp.EncodeInt(length))
+		case "LPOP":
+			h.handleLPOP(cmd)
 		}
 	}
 
 }
 
-func (h *ConnHandler) readCMD() {
-	reader := bufio.NewReader(h.conn)
-	for {
-		parts, err := resp.DecodeArray(reader)
-		if err == io.EOF {
-			log.Println("Client closed connection")
-			return
-		} else if err != nil {
-			log.Println(err.Error())
-			continue
-		}
-		cmd := CMD{}
-		if len(parts) > 0 {
-			cmd.Command = parts[0]
-			if len(parts) > 1 {
-				cmd.Args = parts[1:]
-			}
-			h.in <- cmd
-		}
+func (h *ConnHandler) handleLPOP(cmd CMD) {
+	key := cmd.Args[0]
+	firstElem := kv.LPop(key)
+	if firstElem == nil {
+		h.conn.Write(resp.EncodeNullBulkString())
+	} else {
+		h.conn.Write(resp.EncodeBulkString(firstElem.(string)))
 	}
 }
