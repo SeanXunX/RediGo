@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
@@ -111,6 +112,8 @@ func (h *ConnHandler) Handle() {
 			h.conn.Write(resp.EncodeInt(length))
 		case "LPOP":
 			h.handleLPOP(cmd)
+		case "BLPOP":
+			h.handleBLPOP(cmd)
 		}
 	}
 
@@ -139,4 +142,20 @@ func (h *ConnHandler) handleLPOP(cmd CMD) {
 	case []string:
 		h.conn.Write(resp.EncodeArray(v))
 	}
+}
+
+func (h *ConnHandler) handleBLPOP(cmd CMD) {
+	key := cmd.Args[0]
+	seconds, ok := strconv.ParseFloat(cmd.Args[1], 64)
+	if ok != nil {
+		log.Printf("Unexpected string for float64 waiting time: %s\n", cmd.Args[1])
+	}
+	timeout := time.Duration(seconds * float64(time.Second))
+
+	elem := h.kvStore.BLPop(key, timeout)
+	if elem == nil {
+		h.conn.Write(resp.EncodeNullBulkString())
+		return
+	}
+	h.conn.Write(resp.EncodeBulkString(elem.(string)))
 }
