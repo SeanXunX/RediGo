@@ -152,10 +152,13 @@ func (h *ConnHandler) handleBLPOP(cmd CMD) {
 	}
 	timeout := time.Duration(seconds * float64(time.Second))
 
+	log.Printf("[Debug] Parsed key: %s and timeout %v", key, timeout)
+
 	elem := h.kvStore.BLPop(key, timeout)
 	if elem == nil {
 		h.conn.Write(resp.EncodeNullBulkString())
 		return
 	}
-	h.conn.Write(resp.EncodeBulkString(elem.(string)))
+	res := []string{key, elem.(string)}
+	h.conn.Write(resp.EncodeArray(res))
 }

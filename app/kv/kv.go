@@ -3,6 +3,7 @@ package kv
 import (
 	"context"
 	"fmt"
+	"log"
 	"slices"
 	"sync"
 	"time"
@@ -67,6 +68,7 @@ func (kv *KVStore) Get(key string) (value any) {
 }
 
 func (kv *KVStore) wake(key string) {
+	log.Println("[Debug] Into wake function~")
 	kv.Lock()
 	defer kv.Unlock()
 	wQ, ok := kv.watingQueue[key]
@@ -186,19 +188,17 @@ func (kv *KVStore) LPopN(key string, num int) []string {
 }
 
 func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
-	tarListAny, ok := kv.mp.Load(key)
-	if !ok {
-		return nil
+	if tarListAny, ok := kv.mp.Load(key); ok {
+		tarList := tarListAny.(ListValue)
+		length := len(tarList)
+		if length > 0 {
+			res := tarList[0]
+			tarList = tarList[1:]
+			kv.mp.Store(key, tarList)
+			return res
+		}
 	}
-	tarList := tarListAny.(ListValue)
-
-	length := len(tarList)
-	if length > 0 {
-		res := tarList[0]
-		tarList = tarList[1:]
-		kv.mp.Store(key, tarList)
-		return res
-	}
+	log.Println("[Debug] Failed to get immediately")
 
 	kv.Lock()
 	if _, ok := kv.watingQueue[key]; !ok {
@@ -213,18 +213,22 @@ func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
 	tCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
+	log.Println("[Debut] Before select")
+
 	select {
 	case <-tCtx.Done():
 		return nil
 	case <-ch:
+		// TODO
+		log.Println("[Debug] Awaken~")
 	}
 
-	tarListAny, ok = kv.mp.Load(key)
+	tarListAny, ok := kv.mp.Load(key)
 	if !ok {
 		panic(fmt.Sprintf("Unexpected empty tarList for key: %s", key))
 	}
-	tarList = tarListAny.(ListValue)
-	length = len(tarList)
+	tarList := tarListAny.(ListValue)
+	length := len(tarList)
 	if length == 0 {
 		panic(fmt.Sprintf("Unexpected empty tarList for key: %s", key))
 	}
