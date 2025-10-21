@@ -29,3 +29,8 @@ func EncodeNullArray() (res []byte) {
 	res = fmt.Append(res, "*-1\r\n")
 	return
 }
+
+func EncodeSimpleString(str string) (res []byte) {
+	res = fmt.Appendf(res, "+%s\r\n", str)
+	return
+}

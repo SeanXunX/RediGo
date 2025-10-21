@@ -15,6 +15,23 @@ type KVStore struct {
 	watingQueue map[string][]chan struct{}
 }
 
+type ValueType int
+
+const (
+	StringType ValueType = iota
+	ListType
+	SetType
+	ZSetType
+	HashType
+	StreamType
+	VectorsetType
+)
+
+type StoreValue struct {
+	t ValueType // type
+	v any       // val
+}
+
 type SetValue struct {
 	value     string
 	px        int
@@ -36,7 +53,11 @@ func (kv *KVStore) Set(key, value string) {
 		px:        -1,
 		createdAt: time.Now(),
 	}
-	kv.mp.Store(key, v)
+	storeV := StoreValue{
+		t: StringType,
+		v: v,
+	}
+	kv.mp.Store(key, storeV)
 }
 
 func (kv *KVStore) SetExpire(key, value string, t int) {
@@ -44,15 +65,19 @@ func (kv *KVStore) SetExpire(key, value string, t int) {
 		value:     value,
 		px:        t,
 		createdAt: time.Now()}
-	kv.mp.Store(key, v)
+	storeV := StoreValue{
+		t: StringType,
+		v: v,
+	}
+	kv.mp.Store(key, storeV)
 }
 
 func (kv *KVStore) Get(key string) (value any) {
-	v, ok := kv.mp.Load(key)
+	val, ok := kv.mp.Load(key)
 	if !ok {
 		return nil
 	} else {
-		v := v.(SetValue)
+		v := val.(StoreValue).v.(SetValue)
 		if v.px == -1 {
 			return v.value
 		} else {
@@ -86,7 +111,7 @@ func (kv *KVStore) RPush(key string, value []string) int {
 	if !ok {
 		newTarList = ListValue{}
 	} else {
-		newTarList = oldTarList.(ListValue)
+		newTarList = oldTarList.(StoreValue).v.(ListValue)
 	}
 	newTarList = append(newTarList, value...)
 	kv.mp.Store(key, newTarList)
@@ -100,7 +125,7 @@ func (kv *KVStore) LPush(key string, value []string) int {
 	if !ok {
 		newTarList = ListValue{}
 	} else {
-		newTarList = oldTarList.(ListValue)
+		newTarList = oldTarList.(StoreValue).v.(ListValue)
 	}
 	slices.Reverse(value)
 	newTarList = append(value, newTarList...)
@@ -131,13 +156,13 @@ func (kv *KVStore) LRange(key string, start, stop int) ListValue {
 	if !ok {
 		return res
 	} else {
-		tarList := tarListAny.(ListValue)
+		tarList := tarListAny.(StoreValue).v.(ListValue)
 		length := len(tarList)
 		start, stop = kv.validateRange(start, stop, length)
 		if start >= length || start > stop || stop < 0 {
 			return res
 		}
-		res = tarListAny.(ListValue)[start : stop+1]
+		res = tarList[start : stop+1]
 	}
 	return res
 }
@@ -147,7 +172,7 @@ func (kv *KVStore) LLen(key string) int {
 	if !ok {
 		return 0
 	} else {
-		tarList := tarListAny.(ListValue)
+		tarList := tarListAny.(StoreValue).v.(ListValue)
 		return len(tarList)
 	}
 }
@@ -157,7 +182,7 @@ func (kv *KVStore) LPop(key string) any {
 	if !ok {
 		return nil
 	}
-	tarList := tarListAny.(ListValue)
+	tarList := tarListAny.(StoreValue).v.(ListValue)
 	length := len(tarList)
 	if length == 0 {
 		return nil
@@ -173,7 +198,7 @@ func (kv *KVStore) LPopN(key string, num int) []string {
 	if !ok {
 		return nil
 	}
-	tarList := tarListAny.(ListValue)
+	tarList := tarListAny.(StoreValue).v.(ListValue)
 	length := len(tarList)
 	if length == 0 {
 		return nil
@@ -189,7 +214,7 @@ func (kv *KVStore) LPopN(key string, num int) []string {
 
 func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
 	if tarListAny, ok := kv.mp.Load(key); ok {
-		tarList := tarListAny.(ListValue)
+		tarList := tarListAny.(StoreValue).v.(ListValue)
 		length := len(tarList)
 		if length > 0 {
 			res := tarList[0]
@@ -227,7 +252,6 @@ func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
 	case <-tCtx.Done():
 		return nil
 	case <-ch:
-		// TODO
 		log.Println("[Debug] Awaken~")
 	}
 
@@ -235,7 +259,7 @@ func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
 	if !ok {
 		panic(fmt.Sprintf("Unexpected empty tarList for key: %s", key))
 	}
-	tarList := tarListAny.(ListValue)
+	tarList := tarListAny.(StoreValue).v.(ListValue)
 	length := len(tarList)
 	if length == 0 {
 		panic(fmt.Sprintf("Unexpected empty tarList for key: %s", key))
@@ -244,4 +268,29 @@ func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
 	tarList = tarList[1:]
 	kv.mp.Store(key, tarList)
 	return res
+}
+
+func (kv *KVStore) Type(key string) string {
+	val, ok := kv.mp.Load(key)
+	if !ok {
+		return "none"
+	}
+	switch val.(StoreValue).t {
+	case StringType:
+		return "string"
+	case ListType:
+		return "list"
+	case SetType:
+		return "set"
+	case ZSetType:
+		return "zset"
+	case HashType:
+		return "hash"
+	case StreamType:
+		return "stream"
+	case VectorsetType:
+		return "vectorset"
+	default:
+		return "none"
+	}
 }

@@ -114,6 +114,8 @@ func (h *ConnHandler) Handle() {
 			h.handleLPOP(cmd)
 		case "BLPOP":
 			h.handleBLPOP(cmd)
+		case "TYPE":
+			h.handleType(cmd)
 		}
 	}
 
@@ -161,4 +163,10 @@ func (h *ConnHandler) handleBLPOP(cmd CMD) {
 	}
 	res := []string{key, elem.(string)}
 	h.conn.Write(resp.EncodeArray(res))
+}
+
+func (h *ConnHandler) handleType(cmd CMD) {
+	key := cmd.Args[0]
+	t := h.kvStore.Type(key)
+	h.conn.Write(resp.EncodeSimpleString(t))
 }
