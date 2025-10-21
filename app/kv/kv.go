@@ -47,29 +47,30 @@ func NewKVStore() *KVStore {
 	}
 }
 
+func (kv *KVStore) store(key string, val any, t ValueType) {
+	storeV := StoreValue{
+		t: t,
+		v: val,
+	}
+	kv.mp.Store(key, storeV)
+}
+
 func (kv *KVStore) Set(key, value string) {
 	v := SetValue{
 		value:     value,
 		px:        -1,
 		createdAt: time.Now(),
 	}
-	storeV := StoreValue{
-		t: StringType,
-		v: v,
-	}
-	kv.mp.Store(key, storeV)
+	kv.store(key, v, StringType)
 }
 
 func (kv *KVStore) SetExpire(key, value string, t int) {
 	v := SetValue{
 		value:     value,
 		px:        t,
-		createdAt: time.Now()}
-	storeV := StoreValue{
-		t: StringType,
-		v: v,
+		createdAt: time.Now(),
 	}
-	kv.mp.Store(key, storeV)
+	kv.store(key, v, StringType)
 }
 
 func (kv *KVStore) Get(key string) (value any) {
@@ -114,7 +115,7 @@ func (kv *KVStore) RPush(key string, value []string) int {
 		newTarList = oldTarList.(StoreValue).v.(ListValue)
 	}
 	newTarList = append(newTarList, value...)
-	kv.mp.Store(key, newTarList)
+	kv.store(key, newTarList, ListType)
 	kv.wake(key)
 	return len(newTarList)
 }
@@ -129,7 +130,7 @@ func (kv *KVStore) LPush(key string, value []string) int {
 	}
 	slices.Reverse(value)
 	newTarList = append(value, newTarList...)
-	kv.mp.Store(key, newTarList)
+	kv.store(key, newTarList, ListType)
 	kv.wake(key)
 	return len(newTarList)
 }
@@ -189,7 +190,7 @@ func (kv *KVStore) LPop(key string) any {
 	}
 	res := tarList[0]
 	tarList = tarList[1:]
-	kv.mp.Store(key, tarList)
+	kv.store(key, tarList, ListType)
 	return res
 }
 
@@ -208,7 +209,7 @@ func (kv *KVStore) LPopN(key string, num int) []string {
 	}
 	res := tarList[:num]
 	tarList = tarList[num:]
-	kv.mp.Store(key, tarList)
+	kv.store(key, tarList, ListType)
 	return res
 }
 
@@ -219,7 +220,7 @@ func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
 		if length > 0 {
 			res := tarList[0]
 			tarList = tarList[1:]
-			kv.mp.Store(key, tarList)
+			kv.store(key, tarList, ListType)
 			return res
 		}
 	}
@@ -266,7 +267,7 @@ func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
 	}
 	res := tarList[0]
 	tarList = tarList[1:]
-	kv.mp.Store(key, tarList)
+	kv.store(key, tarList, ListType)
 	return res
 }
 
