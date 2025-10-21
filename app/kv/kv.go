@@ -210,8 +210,16 @@ func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
 	kv.watingQueue[key] = append(kv.watingQueue[key], ch)
 	kv.Unlock()
 
-	tCtx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	var (
+		tCtx   context.Context
+		cancel context.CancelFunc
+	)
+	if timeout == 0 {
+		tCtx = context.Background()
+	} else {
+		tCtx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+	}
 
 	log.Println("[Debut] Before select")
 
