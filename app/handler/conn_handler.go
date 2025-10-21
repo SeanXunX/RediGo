@@ -156,7 +156,7 @@ func (h *ConnHandler) handleBLPOP(cmd CMD) {
 
 	elem := h.kvStore.BLPop(key, timeout)
 	if elem == nil {
-		h.conn.Write(resp.EncodeNullBulkString())
+		h.conn.Write(resp.EncodeNullArray())
 		return
 	}
 	res := []string{key, elem.(string)}

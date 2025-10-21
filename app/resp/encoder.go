@@ -7,13 +7,13 @@ func EncodeInt(num int) (res []byte) {
 	return
 }
 
-func EncodeNullBulkString() (res []byte) {
-	res = fmt.Append(res, "$-1\r\n")
+func EncodeBulkString(str string) (res []byte) {
+	res = fmt.Appendf(res, "$%d\r\n%s\r\n", len(str), str)
 	return
 }
 
-func EncodeBulkString(str string) (res []byte) {
-	res = fmt.Appendf(res, "$%d\r\n%s\r\n", len(str), str)
+func EncodeNullBulkString() (res []byte) {
+	res = fmt.Append(res, "$-1\r\n")
 	return
 }
 
@@ -22,5 +22,10 @@ func EncodeArray(l []string) (res []byte) {
 	for _, str := range l {
 		res = append(res, EncodeBulkString(str)...)
 	}
+	return
+}
+
+func EncodeNullArray() (res []byte) {
+	res = fmt.Append(res, "*-1\r\n")
 	return
 }
