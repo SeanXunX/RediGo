@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/handler"
 	"net"
 	"os"
+
+	"github.com/codecrafters-io/redis-starter-go/app/handler"
+	"github.com/codecrafters-io/redis-starter-go/app/kv"
 )
 
 func main() {
@@ -18,6 +20,9 @@ func main() {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
+
+	kvStore := kv.NewKVStore()
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -25,7 +30,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		h := handler.NewConnHandler(conn)
+		h := handler.NewConnHandler(conn, kvStore)
 		go h.Handle()
 	}
 }

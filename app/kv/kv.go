@@ -1,12 +1,18 @@
 package kv
 
 import (
+	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"time"
 )
 
-var KVStore sync.Map
+type KVStore struct {
+	sync.Mutex
+	mp          sync.Map
+	watingQueue map[string][]chan struct{}
+}
 
 type SetValue struct {
 	value     string
@@ -16,25 +22,32 @@ type SetValue struct {
 
 type ListValue []string
 
-func Set(key, value string) {
+func NewKVStore() *KVStore {
+	return &KVStore{
+		mp:          sync.Map{},
+		watingQueue: make(map[string][]chan struct{}),
+	}
+}
+
+func (kv *KVStore) Set(key, value string) {
 	v := SetValue{
 		value:     value,
 		px:        -1,
 		createdAt: time.Now(),
 	}
-	KVStore.Store(key, v)
+	kv.mp.Store(key, v)
 }
 
-func SetExpire(key, value string, t int) {
+func (kv *KVStore) SetExpire(key, value string, t int) {
 	v := SetValue{
 		value:     value,
 		px:        t,
 		createdAt: time.Now()}
-	KVStore.Store(key, v)
+	kv.mp.Store(key, v)
 }
 
-func Get(key string) (value any) {
-	v, ok := KVStore.Load(key)
+func (kv *KVStore) Get(key string) (value any) {
+	v, ok := kv.mp.Load(key)
 	if !ok {
 		return nil
 	} else {
@@ -53,8 +66,20 @@ func Get(key string) (value any) {
 	}
 }
 
-func RPush(key string, value []string) int {
-	oldTarList, ok := KVStore.Load(key)
+func (kv *KVStore) wake(key string) {
+	kv.Lock()
+	defer kv.Unlock()
+	wQ, ok := kv.watingQueue[key]
+	if !ok || len(wQ) == 0 {
+		return
+	}
+	ch := wQ[0]
+	kv.watingQueue[key] = wQ[1:]
+	ch <- struct{}{}
+}
+
+func (kv *KVStore) RPush(key string, value []string) int {
+	oldTarList, ok := kv.mp.Load(key)
 	var newTarList ListValue
 	if !ok {
 		newTarList = ListValue{}
@@ -62,12 +87,13 @@ func RPush(key string, value []string) int {
 		newTarList = oldTarList.(ListValue)
 	}
 	newTarList = append(newTarList, value...)
-	KVStore.Store(key, newTarList)
+	kv.mp.Store(key, newTarList)
+	kv.wake(key)
 	return len(newTarList)
 }
 
-func LPush(key string, value []string) int {
-	oldTarList, ok := KVStore.Load(key)
+func (kv *KVStore) LPush(key string, value []string) int {
+	oldTarList, ok := kv.mp.Load(key)
 	var newTarList ListValue
 	if !ok {
 		newTarList = ListValue{}
@@ -76,11 +102,12 @@ func LPush(key string, value []string) int {
 	}
 	slices.Reverse(value)
 	newTarList = append(value, newTarList...)
-	KVStore.Store(key, newTarList)
+	kv.mp.Store(key, newTarList)
+	kv.wake(key)
 	return len(newTarList)
 }
 
-func validateRange(start, stop, length int) (int, int) {
+func (kv *KVStore) validateRange(start, stop, length int) (int, int) {
 	if start < 0 {
 		start = length + start
 	}
@@ -96,15 +123,15 @@ func validateRange(start, stop, length int) (int, int) {
 	return start, stop
 }
 
-func LRange(key string, start, stop int) ListValue {
+func (kv *KVStore) LRange(key string, start, stop int) ListValue {
 	res := ListValue{}
-	tarListAny, ok := KVStore.Load(key)
+	tarListAny, ok := kv.mp.Load(key)
 	if !ok {
 		return res
 	} else {
 		tarList := tarListAny.(ListValue)
 		length := len(tarList)
-		start, stop = validateRange(start, stop, length)
+		start, stop = kv.validateRange(start, stop, length)
 		if start >= length || start > stop || stop < 0 {
 			return res
 		}
@@ -113,8 +140,8 @@ func LRange(key string, start, stop int) ListValue {
 	return res
 }
 
-func LLen(key string) int {
-	tarListAny, ok := KVStore.Load(key)
+func (kv *KVStore) LLen(key string) int {
+	tarListAny, ok := kv.mp.Load(key)
 	if !ok {
 		return 0
 	} else {
@@ -123,8 +150,8 @@ func LLen(key string) int {
 	}
 }
 
-func LPop(key string) any {
-	tarListAny, ok := KVStore.Load(key)
+func (kv *KVStore) LPop(key string) any {
+	tarListAny, ok := kv.mp.Load(key)
 	if !ok {
 		return nil
 	}
@@ -135,12 +162,12 @@ func LPop(key string) any {
 	}
 	res := tarList[0]
 	tarList = tarList[1:]
-	KVStore.Store(key, tarList)
+	kv.mp.Store(key, tarList)
 	return res
 }
 
-func LPopN(key string, num int) []string {
-	tarListAny, ok := KVStore.Load(key)
+func (kv *KVStore) LPopN(key string, num int) []string {
+	tarListAny, ok := kv.mp.Load(key)
 	if !ok {
 		return nil
 	}
@@ -154,6 +181,55 @@ func LPopN(key string, num int) []string {
 	}
 	res := tarList[:num]
 	tarList = tarList[num:]
-	KVStore.Store(key, tarList)
+	kv.mp.Store(key, tarList)
+	return res
+}
+
+func (kv *KVStore) BLPop(key string, timeout time.Duration) any {
+	tarListAny, ok := kv.mp.Load(key)
+	if !ok {
+		return nil
+	}
+	tarList := tarListAny.(ListValue)
+
+	length := len(tarList)
+	if length > 0 {
+		res := tarList[0]
+		tarList = tarList[1:]
+		kv.mp.Store(key, tarList)
+		return res
+	}
+
+	kv.Lock()
+	if _, ok := kv.watingQueue[key]; !ok {
+		wQ := []chan struct{}{}
+		kv.watingQueue[key] = wQ
+	}
+
+	ch := make(chan struct{})
+	kv.watingQueue[key] = append(kv.watingQueue[key], ch)
+	kv.Unlock()
+
+	tCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	select {
+	case <-tCtx.Done():
+		return nil
+	case <-ch:
+	}
+
+	tarListAny, ok = kv.mp.Load(key)
+	if !ok {
+		panic(fmt.Sprintf("Unexpected empty tarList for key: %s", key))
+	}
+	tarList = tarListAny.(ListValue)
+	length = len(tarList)
+	if length == 0 {
+		panic(fmt.Sprintf("Unexpected empty tarList for key: %s", key))
+	}
+	res := tarList[0]
+	tarList = tarList[1:]
+	kv.mp.Store(key, tarList)
 	return res
 }

@@ -14,8 +14,9 @@ import (
 )
 
 type ConnHandler struct {
-	conn net.Conn
-	in   chan CMD
+	conn    net.Conn
+	in      chan CMD
+	kvStore *kv.KVStore
 }
 
 type CMD struct {
@@ -23,10 +24,11 @@ type CMD struct {
 	Args    []string
 }
 
-func NewConnHandler(conn net.Conn) *ConnHandler {
+func NewConnHandler(conn net.Conn, store *kv.KVStore) *ConnHandler {
 	return &ConnHandler{
-		conn: conn,
-		in:   make(chan CMD),
+		conn:    conn,
+		in:      make(chan CMD),
+		kvStore: store,
 	}
 }
 
@@ -70,18 +72,18 @@ func (h *ConnHandler) Handle() {
 		case "SET":
 			key, value := cmd.Args[0], cmd.Args[1]
 			if len(cmd.Args) == 2 {
-				kv.Set(key, value)
+				h.kvStore.Set(key, value)
 			} else if len(cmd.Args) == 4 {
 				t, _ := strconv.Atoi(cmd.Args[3])
 				if strings.ToUpper(cmd.Args[2]) == "EX" {
 					t *= 1000
 				}
-				kv.SetExpire(key, value, t)
+				h.kvStore.SetExpire(key, value, t)
 			}
 			fmt.Fprint(h.conn, "+OK\r\n")
 		case "GET":
 			key := cmd.Args[0]
-			val := kv.Get(key)
+			val := h.kvStore.Get(key)
 			if val != nil {
 				fmt.Fprintf(h.conn, "$%d\r\n%s\r\n", len(val.(string)), val.(string))
 			} else {
@@ -90,22 +92,22 @@ func (h *ConnHandler) Handle() {
 		case "RPUSH":
 			key := cmd.Args[0]
 			value := cmd.Args[1:]
-			length := kv.RPush(key, value)
+			length := h.kvStore.RPush(key, value)
 			h.conn.Write(resp.EncodeInt(length))
 		case "LPUSH":
 			key := cmd.Args[0]
 			value := cmd.Args[1:]
-			length := kv.LPush(key, value)
+			length := h.kvStore.LPush(key, value)
 			h.conn.Write(resp.EncodeInt(length))
 		case "LRANGE":
 			key := cmd.Args[0]
 			start, _ := strconv.Atoi(cmd.Args[1])
 			stop, _ := strconv.Atoi(cmd.Args[2])
-			l := kv.LRange(key, start, stop)
+			l := h.kvStore.LRange(key, start, stop)
 			h.conn.Write(resp.EncodeArray(l))
 		case "LLEN":
 			key := cmd.Args[0]
-			length := kv.LLen(key)
+			length := h.kvStore.LLen(key)
 			h.conn.Write(resp.EncodeInt(length))
 		case "LPOP":
 			h.handleLPOP(cmd)
@@ -120,10 +122,10 @@ func (h *ConnHandler) handleLPOP(cmd CMD) {
 
 	switch len(cmd.Args) {
 	case 1:
-		elem = kv.LPop(key)
+		elem = h.kvStore.LPop(key)
 	case 2:
 		num, _ := strconv.Atoi(cmd.Args[1])
-		elem = kv.LPopN(key, num)
+		elem = h.kvStore.LPopN(key, num)
 	}
 
 	if elem == nil {
