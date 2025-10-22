@@ -46,7 +46,12 @@ func parseIDString(str string, lastID any) (StreamID, error) {
 					seq = 0
 				}
 			} else {
-				seq = lastID.(StreamID).Seq + 1
+				lastStremID := lastID.(StreamID)
+				if lastStremID.Ms == ms {
+					seq = lastStremID.Seq + 1
+				} else {
+					seq = 0
+				}
 			}
 		} else {
 			// "<ms>-<seq>"
