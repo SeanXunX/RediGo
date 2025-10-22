@@ -156,8 +156,6 @@ func (h *ConnHandler) handleBLPOP(cmd CMD) {
 	}
 	timeout := time.Duration(seconds * float64(time.Second))
 
-	log.Printf("[Debug] Parsed key: %s and timeout %v", key, timeout)
-
 	elem := h.kvStore.BLPop(key, timeout)
 	if elem == nil {
 		h.conn.Write(resp.EncodeNullArray())
@@ -176,12 +174,15 @@ func (h *ConnHandler) handleType(cmd CMD) {
 func (h *ConnHandler) handleXADD(cmd CMD) {
 	key := cmd.Args[0]
 	id := cmd.Args[1]
-	pairs := []kv.Entry{}
+	data := map[string]string{}
 
 	for i := 2; i < len(cmd.Args); i += 2 {
 		k, v := cmd.Args[i], cmd.Args[i+1]
-		pairs = append(pairs, kv.Entry{Key: k, Value: v})
+		data[k] = v
 	}
-	retId := h.kvStore.XAdd(key, id, pairs)
-	h.conn.Write(resp.EncodeBulkString(retId))
+	res, t := h.kvStore.XAdd(key, id, data)
+	if t == -1 {
+		h.conn.Write(resp.EncodeBulkString(res))
+	}
+	h.conn.Write(resp.EncodeBulkString(res))
 }
