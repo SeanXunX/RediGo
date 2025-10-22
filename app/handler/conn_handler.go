@@ -182,7 +182,7 @@ func (h *ConnHandler) handleXADD(cmd CMD) {
 	}
 	res, t := h.kvStore.XAdd(key, id, data)
 	if t == -1 {
-		h.conn.Write(resp.EncodeBulkString(res))
+		h.conn.Write([]byte(res))
 	}
 	h.conn.Write(resp.EncodeBulkString(res))
 }
