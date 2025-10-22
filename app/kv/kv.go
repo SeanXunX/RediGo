@@ -40,6 +40,13 @@ type SetValue struct {
 
 type ListValue []string
 
+type Entry struct {
+	Key   string
+	Value string
+}
+
+type StreamValue []Entry
+
 func NewKVStore() *KVStore {
 	return &KVStore{
 		mp:          sync.Map{},
@@ -294,4 +301,18 @@ func (kv *KVStore) Type(key string) string {
 	default:
 		return "none"
 	}
+}
+
+func (kv *KVStore) XAdd(key string, id string, pairs []Entry) string {
+	tarStreamAny, ok := kv.mp.Load(key)
+	var tarStream StreamValue
+	if !ok {
+		// Not existed. Create a new stream.
+		tarStream = StreamValue{}
+	} else {
+		tarStream = tarStreamAny.(StoreValue).v.(StreamValue)
+	}
+	tarStream = append(tarStream, pairs...)
+	kv.store(key, tarStream, StreamType)
+	return id
 }

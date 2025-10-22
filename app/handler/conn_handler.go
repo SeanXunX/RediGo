@@ -116,6 +116,8 @@ func (h *ConnHandler) Handle() {
 			h.handleBLPOP(cmd)
 		case "TYPE":
 			h.handleType(cmd)
+		case "XADD":
+			h.handleXADD(cmd)
 		}
 	}
 
@@ -169,4 +171,17 @@ func (h *ConnHandler) handleType(cmd CMD) {
 	key := cmd.Args[0]
 	t := h.kvStore.Type(key)
 	h.conn.Write(resp.EncodeSimpleString(t))
+}
+
+func (h *ConnHandler) handleXADD(cmd CMD) {
+	key := cmd.Args[0]
+	id := cmd.Args[1]
+	pairs := []kv.Entry{}
+
+	for i := 2; i < len(cmd.Args); i += 2 {
+		k, v := cmd.Args[i], cmd.Args[i+1]
+		pairs = append(pairs, kv.Entry{Key: k, Value: v})
+	}
+	retId := h.kvStore.XAdd(key, id, pairs)
+	h.conn.Write(resp.EncodeBulkString(retId))
 }
