@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type StreamID struct {
@@ -27,6 +28,13 @@ func parseIDString(str string, lastID any) (StreamID, error) {
 
 	if str == "*" {
 		// "*"
+		ms = time.Now().UnixMilli()
+		if lastID != nil && lastID.(StreamID).Ms == ms {
+			seq = lastID.(StreamID).Seq + 1
+		} else {
+			seq = 0
+		}
+
 	} else {
 		parts := strings.Split(str, "-")
 		if len(parts) != 2 {
