@@ -20,6 +20,7 @@ const (
 	HashType
 	StreamType
 	VectorsetType
+	ErrorType
 )
 
 type StoreValue struct {

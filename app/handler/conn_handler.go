@@ -181,8 +181,9 @@ func (h *ConnHandler) handleXADD(cmd CMD) {
 		data[k] = v
 	}
 	res, t := h.kvStore.XAdd(key, id, data)
-	if t == -1 {
+	if t == kv.ErrorType {
 		h.conn.Write(resp.EncodeSimpleError(res))
+	} else if t == kv.StringType {
+		h.conn.Write(resp.EncodeBulkString(res))
 	}
-	h.conn.Write(resp.EncodeBulkString(res))
 }

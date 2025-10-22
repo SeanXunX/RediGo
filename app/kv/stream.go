@@ -68,7 +68,7 @@ func (kv *KVStore) XAdd(key string, idStr string, data map[string]string) (res s
 		tarStream = tarStreamAny.(StoreValue).v.(StreamValue)
 		fmt.Println(tarStream.lastID, id)
 		if !less(tarStream.lastID, id) {
-			return "The ID specified in XADD is equal or smaller than the target stream top item", -1
+			return "The ID specified in XADD is equal or smaller than the target stream top item", ErrorType
 		}
 	}
 	tarStream.entries = append(tarStream.entries, StreamEntry{ID: id, Data: data})
