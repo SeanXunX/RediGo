@@ -2,7 +2,6 @@ package kv
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -138,6 +137,12 @@ func findLastStreamID(entries []StreamEntry, ms int64) StreamID {
 // For the start ID, the sequence number defaults to 0.
 // For the end ID, the sequence number defaults to the maximum sequence number.
 func (kv *KVStore) parseRangeID(entries []StreamEntry, idStr string, isStart bool) StreamID {
+	if idStr == "-" {
+		return entries[0].ID
+	}
+	if idStr == "+" {
+		return entries[len(entries)-1].ID
+	}
 	parts := strings.Split(idStr, "-")
 	ms, _ := strconv.ParseInt(parts[0], 10, 64)
 	var seq int64
@@ -161,11 +166,7 @@ func (kv *KVStore) XRange(key, id1, id2 string) []StreamEntry {
 	tarStreamAny, _ := kv.mp.Load(key)
 	entries := tarStreamAny.(StoreValue).v.(StreamValue).entries
 
-	log.Printf("[debug] entries = %#v\n", entries)
-
 	start, end := kv.parseRangeID(entries, id1, true), kv.parseRangeID(entries, id2, false)
-
-	log.Printf("[debug] start= %d-%d, end= %d-%d\n", start.Ms, start.Seq, end.Ms, end.Seq)
 
 	startIdx := sort.Search(len(entries), func(i int) bool {
 		res := !less(entries[i].ID, start)
@@ -176,8 +177,5 @@ func (kv *KVStore) XRange(key, id1, id2 string) []StreamEntry {
 		return !less(entries[i].ID, end) && !equal(end, entries[i].ID)
 	})
 
-	log.Printf("[debug] len(entries) = %d, startIdx = %d, endIdx = %d\n", len(entries), startIdx, endIdx)
-
 	return entries[startIdx:endIdx]
-
 }
