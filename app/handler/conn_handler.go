@@ -118,6 +118,8 @@ func (h *ConnHandler) Handle() {
 			h.handleType(cmd)
 		case "XADD":
 			h.handleXADD(cmd)
+		case "XRANGE":
+			h.handleXRANGE(cmd)
 		}
 	}
 
@@ -186,4 +188,12 @@ func (h *ConnHandler) handleXADD(cmd CMD) {
 	} else if t == kv.StringType {
 		h.conn.Write(resp.EncodeBulkString(res))
 	}
+}
+
+func (h *ConnHandler) handleXRANGE(cmd CMD) {
+	key := cmd.Args[0]
+	id1, id2 := cmd.Args[1], cmd.Args[2]
+
+	resEntries := h.kvStore.XRange(key, id1, id2)
+	h.conn.Write(resp.EncodeXRangeRes(resEntries))
 }

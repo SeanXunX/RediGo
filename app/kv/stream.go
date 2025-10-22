@@ -2,6 +2,8 @@ package kv
 
 import (
 	"fmt"
+	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,8 +20,19 @@ type StreamEntry struct {
 }
 
 type StreamValue struct {
-	lastID  StreamID
+	lastID  StreamID // The last stream id of the entry.
 	entries []StreamEntry
+}
+
+func less(id1, id2 StreamID) bool {
+	if id1.Ms == id2.Ms {
+		return id1.Seq < id2.Seq
+	}
+	return id1.Ms < id2.Ms
+}
+
+func equal(id1, id2 StreamID) bool {
+	return id1.Ms == id2.Ms && id1.Seq == id2.Seq
 }
 
 func parseIDString(str string, lastID any) (StreamID, error) {
@@ -72,13 +85,6 @@ func parseIDString(str string, lastID any) (StreamID, error) {
 	return StreamID{Ms: ms, Seq: seq}, nil
 }
 
-func less(prev, cur StreamID) bool {
-	if prev.Ms == cur.Ms {
-		return prev.Seq < cur.Seq
-	}
-	return prev.Ms < cur.Ms
-}
-
 func (kv *KVStore) XAdd(key string, idStr string, data map[string]string) (res string, t ValueType) {
 
 	var id StreamID
@@ -109,4 +115,69 @@ func (kv *KVStore) XAdd(key string, idStr string, data map[string]string) (res s
 	kv.store(key, tarStream, StreamType)
 	resIdStr := fmt.Sprintf("%d-%d", id.Ms, id.Seq)
 	return resIdStr, StringType
+}
+
+// Find the last stream id with ms.
+func findLastStreamID(entries []StreamEntry, ms int64) StreamID {
+	nextID := StreamID{
+		Ms:  ms + 1,
+		Seq: 0,
+	}
+	l, r := 0, len(entries)-1
+	for l <= r {
+		mid := (r-l)/2 + l
+		if !less(nextID, entries[mid].ID) {
+			r = mid - 1
+		} else {
+			l = mid + 1
+		}
+	}
+	return entries[r].ID
+}
+
+// For the start ID, the sequence number defaults to 0.
+// For the end ID, the sequence number defaults to the maximum sequence number.
+func (kv *KVStore) parseRangeID(entries []StreamEntry, idStr string, isStart bool) StreamID {
+	parts := strings.Split(idStr, "-")
+	ms, _ := strconv.ParseInt(parts[0], 10, 64)
+	var seq int64
+	if len(parts) == 2 {
+		// "<ms>-<seq>"
+		seq, _ = strconv.ParseInt(parts[1], 10, 64)
+	} else {
+		// "<ms>"
+		if isStart {
+			seq = 0
+		} else {
+			seq = findLastStreamID(entries, ms).Seq
+		}
+	}
+	return StreamID{Ms: ms, Seq: seq}
+}
+
+// Retrieves a range of entries from a stream. The range is inclusive.
+func (kv *KVStore) XRange(key, id1, id2 string) []StreamEntry {
+
+	tarStreamAny, _ := kv.mp.Load(key)
+	entries := tarStreamAny.(StoreValue).v.(StreamValue).entries
+
+	log.Printf("[debug] entries = %#v\n", entries)
+
+	start, end := kv.parseRangeID(entries, id1, true), kv.parseRangeID(entries, id2, false)
+
+	log.Printf("[debug] start= %d-%d, end= %d-%d\n", start.Ms, start.Seq, end.Ms, end.Seq)
+
+	startIdx := sort.Search(len(entries), func(i int) bool {
+		res := !less(entries[i].ID, start)
+		return res
+	})
+
+	endIdx := sort.Search(len(entries), func(i int) bool {
+		return !less(entries[i].ID, end) && !equal(end, entries[i].ID)
+	})
+
+	log.Printf("[debug] len(entries) = %d, startIdx = %d, endIdx = %d\n", len(entries), startIdx, endIdx)
+
+	return entries[startIdx:endIdx]
+
 }
