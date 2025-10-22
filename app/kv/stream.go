@@ -55,6 +55,9 @@ func less(prev, cur StreamID) bool {
 
 func (kv *KVStore) XAdd(key string, idStr string, data map[string]string) (res string, t ValueType) {
 	id, err := parseIDString(idStr)
+	if id.Ms == 0 && id.Seq == 0 {
+		return "The ID specified in XADD must be greater than 0-0", ErrorType
+	}
 	if err != nil {
 		log.Println(err.Error())
 	}
