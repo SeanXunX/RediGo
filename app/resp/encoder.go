@@ -34,3 +34,8 @@ func EncodeSimpleString(str string) (res []byte) {
 	res = fmt.Appendf(res, "+%s\r\n", str)
 	return
 }
+
+func EncodeSimpleError(str string) (res []byte) {
+	res = fmt.Appendf(res, "-ERR %s\r\n", str)
+	return
+}
