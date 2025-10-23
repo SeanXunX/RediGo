@@ -248,6 +248,11 @@ func (h *ConnHandler) handleXREAD(cmd CMD) {
 
 func (h *ConnHandler) handleINCR(cmd CMD) {
 	key := cmd.Args[0]
-	res := h.kvStore.Incr(key)
-	h.conn.Write(resp.EncodeInt64(res))
+	res, t := h.kvStore.Incr(key)
+
+	if t == kv.ErrorType {
+		h.conn.Write(resp.EncodeSimpleError(res.(string)))
+	}
+
+	h.conn.Write(resp.EncodeInt64(res.(int64)))
 }

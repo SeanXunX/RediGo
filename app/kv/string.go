@@ -50,7 +50,7 @@ func (kv *KVStore) Get(key string) (value any) {
 	}
 }
 
-func (kv *KVStore) Incr(key string) int64 {
+func (kv *KVStore) Incr(key string) (any, ValueType) {
 	storeValAny, ok := kv.mp.Load(key)
 	var val int64
 	if !ok {
@@ -59,10 +59,11 @@ func (kv *KVStore) Incr(key string) int64 {
 		stringVal := storeValAny.(StoreValue).v.(StringValue).value
 		if intVal, err := strconv.ParseInt(stringVal, 10, 64); err != nil {
 			// not int string
+			return "value is not an integer or out of range", ErrorType
 		} else {
 			val = intVal + 1
 		}
 	}
 	kv.Set(key, fmt.Sprintf("%d", val))
-	return val
+	return val, StringType
 }
