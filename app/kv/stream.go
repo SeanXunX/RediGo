@@ -240,8 +240,16 @@ func (kv *KVStore) XRead(
 		}
 
 		// block
-		tCtx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
+		var (
+			tCtx   context.Context
+			cancel context.CancelFunc
+		)
+		if timeout == 0 {
+			tCtx = context.Background()
+		} else {
+			tCtx, cancel = context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+		}
 		waitCh := make(chan struct{})
 		// log.Println("[debug] Before go")
 		go func() {
