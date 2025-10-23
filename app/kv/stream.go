@@ -1,6 +1,7 @@
 package kv
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sort"
@@ -86,7 +87,6 @@ func parseIDString(str string, lastID any) (StreamID, error) {
 }
 
 func (kv *KVStore) XAdd(key string, idStr string, data map[string]string) (res string, t ValueType) {
-
 	var id StreamID
 	tarStreamAny, ok := kv.mp.Load(key)
 	var tarStream StreamValue
@@ -113,6 +113,10 @@ func (kv *KVStore) XAdd(key string, idStr string, data map[string]string) (res s
 	tarStream.entries = append(tarStream.entries, StreamEntry{ID: id, Data: data})
 	tarStream.lastID = id
 	kv.store(key, tarStream, StreamType)
+
+	kv.fanOutCond.Broadcast()
+	// log.Println("[debug] broadcasted")
+
 	resIdStr := fmt.Sprintf("%d-%d", id.Ms, id.Seq)
 	return resIdStr, StringType
 }
@@ -192,29 +196,67 @@ func (kv *KVStore) XRange(key, id1, id2 string) []StreamEntry {
 }
 
 // XRead reads data from one or multiple streams.
-func (kv *KVStore) XRead(keys []string, ids []string, cnt int) [][]StreamEntry {
+func (kv *KVStore) XRead(
+	keys []string,
+	ids []string,
+	cnt int,
+	isBlock bool,
+	timeout time.Duration,
+) [][]StreamEntry {
+
 	n := len(keys)
 	res := make([][]StreamEntry, n)
-	for i := range n {
-		entries, ok := kv.getEntries(keys[i])
-		if !ok {
-			log.Printf("[warning]: key (%s) does not exist", keys[i])
-			continue
+
+	for {
+		gottenRes := false
+		for i := range n {
+			entries, ok := kv.getEntries(keys[i])
+			if !ok {
+				log.Printf("[warning]: key (%s) does not exist", keys[i])
+				continue
+			}
+
+			start := kv.parseRangeID(entries, ids[i], true)
+
+			startIdx := sort.Search(len(entries), func(i int) bool {
+				res := !less(entries[i].ID, start) && !equal(start, entries[i].ID)
+				return res
+			})
+
+			if startIdx != len(entries) {
+				gottenRes = true
+			}
+
+			endIdx := len(entries)
+
+			if cnt > 0 {
+				endIdx = startIdx + cnt
+			}
+			res[i] = entries[startIdx:endIdx]
 		}
 
-		start := kv.parseRangeID(entries, ids[i], true)
-
-		startIdx := sort.Search(len(entries), func(i int) bool {
-			res := !less(entries[i].ID, start) && !equal(start, entries[i].ID)
+		if gottenRes || !isBlock {
 			return res
-		})
-		endIdx := len(entries)
-
-		if cnt > 0 {
-			endIdx = startIdx + cnt
 		}
-		res[i] = entries[startIdx:endIdx]
 
+		// block
+		tCtx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		waitCh := make(chan struct{})
+		// log.Println("[debug] Before go")
+		go func() {
+			kv.Lock()
+			kv.fanOutCond.Wait()
+			waitCh <- struct{}{}
+			// log.Println("[debug] go func waked up")
+			kv.Unlock()
+		}()
+		// log.Println("[debug] Before select")
+		select {
+		case <-tCtx.Done():
+			return nil
+		case <-waitCh:
+			// log.Println("[debug] waitCh wakes up")
+		}
 	}
-	return res
 }

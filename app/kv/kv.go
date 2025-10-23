@@ -7,7 +7,8 @@ import (
 type KVStore struct {
 	sync.Mutex
 	mp          sync.Map
-	watingQueue map[string][]chan struct{}
+	watingQueue map[string][]chan struct{} // exclusive chan for each blpop client
+	fanOutCond  *sync.Cond                 // fan-out sync for all xread blocked at same stream
 }
 
 type ValueType int
@@ -29,10 +30,12 @@ type StoreValue struct {
 }
 
 func NewKVStore() *KVStore {
-	return &KVStore{
+	kv := &KVStore{
 		mp:          sync.Map{},
 		watingQueue: make(map[string][]chan struct{}),
 	}
+	kv.fanOutCond = sync.NewCond(&kv.Mutex)
+	return kv
 }
 
 func (kv *KVStore) store(key string, val any, t ValueType) {

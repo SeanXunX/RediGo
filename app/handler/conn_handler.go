@@ -205,6 +205,20 @@ func (h *ConnHandler) handleXREAD(cmd CMD) {
 		count, _ = strconv.Atoi(cmd.Args[1])
 	}
 
+	isBlock := false
+	var timeout time.Duration
+
+	if resp.CmpStrNoCase(cmd.Args[0], "BLOCK") {
+		isBlock = true
+		ms, _ := strconv.Atoi(cmd.Args[1])
+		timeout = time.Duration(ms) * time.Millisecond
+	}
+	if resp.CmpStrNoCase(cmd.Args[2], "BLOCK") {
+		isBlock = true
+		ms, _ := strconv.Atoi(cmd.Args[3])
+		timeout = time.Duration(ms) * time.Millisecond
+	}
+
 	findSTREAMS := func() int {
 		for i, s := range cmd.Args {
 			if resp.CmpStrNoCase(s, "STREAMS") {
@@ -221,7 +235,11 @@ func (h *ConnHandler) handleXREAD(cmd CMD) {
 			keys[i] = cmd.Args[baseIdx+i+1]
 			ids[i] = cmd.Args[baseIdx+num+i+1]
 		}
-		resEntries := h.kvStore.XRead(keys, ids, count)
+		resEntries := h.kvStore.XRead(keys, ids, count, isBlock, timeout)
+		if resEntries == nil {
+			h.conn.Write(resp.EncodeNullArray())
+			return
+		}
 		h.conn.Write(resp.EncodeStreamEntriesWithKeys(keys, resEntries))
 	}
 }
