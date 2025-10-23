@@ -142,10 +142,6 @@ func findLastStreamID(entries []StreamEntry, ms int64) StreamID {
 // For the start ID, the sequence number defaults to 0.
 // For the end ID, the sequence number defaults to the maximum sequence number.
 func (kv *KVStore) parseRangeID(entries []StreamEntry, idStr string, isStart bool) StreamID {
-	if idStr == "$" {
-		ms := time.Now().UnixMilli()
-		return StreamID{Ms: ms, Seq: 0}
-	}
 	if idStr == "-" {
 		return entries[0].ID
 	}
@@ -199,6 +195,14 @@ func (kv *KVStore) XRange(key, id1, id2 string) []StreamEntry {
 	return entries[startIdx:endIdx]
 }
 
+func (kv *KVStore) getLastID(key string) (StreamID, bool) {
+	tarStreamAny, ok := kv.mp.Load(key)
+	if !ok {
+		return StreamID{}, ok
+	}
+	return tarStreamAny.(StoreValue).v.(StreamValue).lastID, ok
+}
+
 // XRead reads data from one or multiple streams.
 func (kv *KVStore) XRead(
 	keys []string,
@@ -216,18 +220,29 @@ func (kv *KVStore) XRead(
 		for i := range n {
 			entries, ok := kv.getEntries(keys[i])
 			if !ok {
+				// Key not exists
+				if ids[i] == "$" {
+					ids[i] = "0-0"
+				}
 				log.Printf("[warning]: key (%s) does not exist", keys[i])
 				continue
 			}
 
-			log.Printf("[debug] ids[i] = %s", ids[i])
+			var start StreamID
+			var startIdx int
 
-			start := kv.parseRangeID(entries, ids[i], true)
-
-			startIdx := sort.Search(len(entries), func(i int) bool {
-				res := !less(entries[i].ID, start) && !equal(start, entries[i].ID)
-				return res
-			})
+			if ids[i] == "$" {
+				lastID, _ := kv.getLastID(keys[i])
+				ids[i] = fmt.Sprintf("%d-%d", lastID.Ms, lastID.Seq)
+				start = lastID
+				startIdx = len(entries)
+			} else {
+				start = kv.parseRangeID(entries, ids[i], true)
+				startIdx = sort.Search(len(entries), func(i int) bool {
+					res := !less(entries[i].ID, start) && !equal(start, entries[i].ID)
+					return res
+				})
+			}
 
 			if startIdx != len(entries) {
 				gottenRes = true
