@@ -63,13 +63,22 @@ func EncodeStreamEntries(entries []kv.StreamEntry) (res []byte) {
 }
 
 func EncodeStreamEntriesWithKeys(keys []string, mulEntries [][]kv.StreamEntry) (res []byte) {
-	res = fmt.Appendf(res, "*%d\r\n", len(keys))
+	cnt := 0
 	for i := range len(keys) {
+		if len(mulEntries[i]) == 0 {
+			continue
+		}
+		cnt++
 		// key
 		res = fmt.Append(res, "*2\r\n")
 		res = append(res, EncodeBulkString(keys[i])...)
 		// entries
 		res = append(res, EncodeStreamEntries(mulEntries[i])...)
 	}
+	if cnt == 0 {
+		return EncodeNullArray()
+	}
+	cntLine := fmt.Appendf([]byte{}, "*%d\r\n", cnt)
+	res = append(cntLine, res...)
 	return
 }

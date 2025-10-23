@@ -42,7 +42,6 @@ func (h *ConnHandler) readCMD() {
 	for {
 		parts, err := resp.DecodeArray(reader)
 		if err == io.EOF {
-			log.Println("Client closed connection")
 			return
 		} else if err != nil {
 			log.Println(err.Error())
@@ -220,9 +219,8 @@ func (h *ConnHandler) handleXREAD(cmd CMD) {
 		ids := make([]string, num)
 		for i := range num {
 			keys[i] = cmd.Args[baseIdx+i+1]
-			ids[i] = cmd.Args[baseIdx+count+i+1]
+			ids[i] = cmd.Args[baseIdx+num+i+1]
 		}
-
 		resEntries := h.kvStore.XRead(keys, ids, count)
 		h.conn.Write(resp.EncodeStreamEntriesWithKeys(keys, resEntries))
 	}

@@ -161,14 +161,21 @@ func (kv *KVStore) parseRangeID(entries []StreamEntry, idStr string, isStart boo
 	return StreamID{Ms: ms, Seq: seq}
 }
 
-func (kv *KVStore) getEntries(key string) []StreamEntry {
-	tarStreamAny, _ := kv.mp.Load(key)
-	return tarStreamAny.(StoreValue).v.(StreamValue).entries
+func (kv *KVStore) getEntries(key string) ([]StreamEntry, bool) {
+	tarStreamAny, ok := kv.mp.Load(key)
+	if !ok {
+		return []StreamEntry{}, ok
+	}
+	return tarStreamAny.(StoreValue).v.(StreamValue).entries, ok
 }
 
 // Retrieves a range of entries from a stream. The range is inclusive.
 func (kv *KVStore) XRange(key, id1, id2 string) []StreamEntry {
-	entries := kv.getEntries(key)
+	entries, ok := kv.getEntries(key)
+	if !ok {
+		log.Printf("[error]: key (%s) does not exist", key)
+		return []StreamEntry{}
+	}
 
 	start, end := kv.parseRangeID(entries, id1, true), kv.parseRangeID(entries, id2, false)
 
@@ -189,22 +196,25 @@ func (kv *KVStore) XRead(keys []string, ids []string, cnt int) [][]StreamEntry {
 	n := len(keys)
 	res := make([][]StreamEntry, n)
 	for i := range n {
-		entries := kv.getEntries(keys[i])
+		entries, ok := kv.getEntries(keys[i])
+		if !ok {
+			log.Printf("[warning]: key (%s) does not exist", keys[i])
+			continue
+		}
+
 		start := kv.parseRangeID(entries, ids[i], true)
+
 		startIdx := sort.Search(len(entries), func(i int) bool {
 			res := !less(entries[i].ID, start) && !equal(start, entries[i].ID)
 			return res
 		})
 		endIdx := len(entries)
 
-		log.Printf("[debug] In %d round, startIdx=%d, endIdx=%d", i, startIdx, endIdx)
-
 		if cnt > 0 {
 			endIdx = startIdx + cnt
 		}
 		res[i] = entries[startIdx:endIdx]
 
-		log.Printf("[debug] In %d round, res = %+v", i, res)
 	}
 	return res
 }
