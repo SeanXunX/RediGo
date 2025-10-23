@@ -145,7 +145,7 @@ func (kv *KVStore) parseRangeID(entries []StreamEntry, idStr string, isStart boo
 	if idStr == "-" {
 		return entries[0].ID
 	}
-	if idStr == "+" {
+	if idStr == "+" || idStr == "$" {
 		return entries[len(entries)-1].ID
 	}
 	parts := strings.Split(idStr, "-")
