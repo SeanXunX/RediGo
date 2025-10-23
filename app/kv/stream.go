@@ -142,10 +142,14 @@ func findLastStreamID(entries []StreamEntry, ms int64) StreamID {
 // For the start ID, the sequence number defaults to 0.
 // For the end ID, the sequence number defaults to the maximum sequence number.
 func (kv *KVStore) parseRangeID(entries []StreamEntry, idStr string, isStart bool) StreamID {
+	if idStr == "$" {
+		ms := time.Now().UnixMilli()
+		return StreamID{Ms: ms, Seq: 0}
+	}
 	if idStr == "-" {
 		return entries[0].ID
 	}
-	if idStr == "+" || idStr == "$" {
+	if idStr == "+" {
 		return entries[len(entries)-1].ID
 	}
 	parts := strings.Split(idStr, "-")
@@ -215,6 +219,8 @@ func (kv *KVStore) XRead(
 				log.Printf("[warning]: key (%s) does not exist", keys[i])
 				continue
 			}
+
+			log.Printf("[debug] ids[i] = %s", ids[i])
 
 			start := kv.parseRangeID(entries, ids[i], true)
 
