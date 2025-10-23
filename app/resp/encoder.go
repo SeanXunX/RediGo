@@ -44,7 +44,7 @@ func EncodeSimpleError(str string) (res []byte) {
 	return
 }
 
-func EncodeXRangeRes(entries []kv.StreamEntry) (res []byte) {
+func EncodeStreamEntries(entries []kv.StreamEntry) (res []byte) {
 	res = fmt.Appendf(res, "*%d\r\n", len(entries))
 	for _, entry := range entries {
 		// id
@@ -58,6 +58,18 @@ func EncodeXRangeRes(entries []kv.StreamEntry) (res []byte) {
 			res = append(res, EncodeBulkString(k)...)
 			res = append(res, EncodeBulkString(v)...)
 		}
+	}
+	return
+}
+
+func EncodeStreamEntriesWithKeys(keys []string, mulEntries [][]kv.StreamEntry) (res []byte) {
+	res = fmt.Appendf(res, "*%d\r\n", len(keys))
+	for i := range len(keys) {
+		// key
+		res = fmt.Append(res, "*2\r\n")
+		res = append(res, EncodeBulkString(keys[i])...)
+		// entries
+		res = append(res, EncodeStreamEntries(mulEntries[i])...)
 	}
 	return
 }

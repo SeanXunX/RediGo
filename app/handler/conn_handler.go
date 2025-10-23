@@ -120,6 +120,8 @@ func (h *ConnHandler) Handle() {
 			h.handleXADD(cmd)
 		case "XRANGE":
 			h.handleXRANGE(cmd)
+		case "XREAD":
+			h.handleXREAD(cmd)
 		}
 	}
 
@@ -195,5 +197,33 @@ func (h *ConnHandler) handleXRANGE(cmd CMD) {
 	id1, id2 := cmd.Args[1], cmd.Args[2]
 
 	resEntries := h.kvStore.XRange(key, id1, id2)
-	h.conn.Write(resp.EncodeXRangeRes(resEntries))
+	h.conn.Write(resp.EncodeStreamEntries(resEntries))
+}
+
+func (h *ConnHandler) handleXREAD(cmd CMD) {
+	count := -1
+	if resp.CmpStrNoCase(cmd.Args[0], "COUNT") {
+		count, _ = strconv.Atoi(cmd.Args[1])
+	}
+
+	findSTREAMS := func() int {
+		for i, s := range cmd.Args {
+			if resp.CmpStrNoCase(s, "STREAMS") {
+				return i
+			}
+		}
+		return -1
+	}
+	if baseIdx := findSTREAMS(); baseIdx != -1 {
+		num := (len(cmd.Args) - 1 - baseIdx) / 2
+		keys := make([]string, num)
+		ids := make([]string, num)
+		for i := range num {
+			keys[i] = cmd.Args[baseIdx+i+1]
+			ids[i] = cmd.Args[baseIdx+count+i+1]
+		}
+
+		resEntries := h.kvStore.XRead(keys, ids, count)
+		h.conn.Write(resp.EncodeStreamEntriesWithKeys(keys, resEntries))
+	}
 }
