@@ -11,6 +11,11 @@ func EncodeInt(num int) (res []byte) {
 	return
 }
 
+func EncodeInt64(integer int64) (res []byte) {
+	res = fmt.Appendf(res, ":%d\r\n", integer)
+	return
+}
+
 func EncodeBulkString(str string) (res []byte) {
 	res = fmt.Appendf(res, "$%d\r\n%s\r\n", len(str), str)
 	return

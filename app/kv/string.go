@@ -1,6 +1,10 @@
 package kv
 
-import "time"
+import (
+	"fmt"
+	"strconv"
+	"time"
+)
 
 type StringValue struct {
 	value     string
@@ -44,4 +48,21 @@ func (kv *KVStore) Get(key string) (value any) {
 			}
 		}
 	}
+}
+
+func (kv *KVStore) Incr(key string) int64 {
+	storeValAny, ok := kv.mp.Load(key)
+	var val int64
+	if !ok {
+		val = 1
+	} else {
+		stringVal := storeValAny.(StoreValue).v.(StringValue).value
+		if intVal, err := strconv.ParseInt(stringVal, 10, 64); err != nil {
+			// not int string
+		} else {
+			val = intVal + 1
+		}
+	}
+	kv.Set(key, fmt.Sprintf("%d", val))
+	return val
 }

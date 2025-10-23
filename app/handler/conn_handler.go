@@ -121,6 +121,8 @@ func (h *ConnHandler) Handle() {
 			h.handleXRANGE(cmd)
 		case "XREAD":
 			h.handleXREAD(cmd)
+		case "INCR":
+			h.handleINCR(cmd)
 		}
 	}
 
@@ -242,4 +244,10 @@ func (h *ConnHandler) handleXREAD(cmd CMD) {
 		}
 		h.conn.Write(resp.EncodeStreamEntriesWithKeys(keys, resEntries))
 	}
+}
+
+func (h *ConnHandler) handleINCR(cmd CMD) {
+	key := cmd.Args[0]
+	res := h.kvStore.Incr(key)
+	h.conn.Write(resp.EncodeInt64(res))
 }
