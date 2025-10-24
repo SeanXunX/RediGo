@@ -123,6 +123,8 @@ func (h *ConnHandler) Handle() {
 			h.handleXREAD(cmd)
 		case "INCR":
 			h.handleINCR(cmd)
+		case "MULTI":
+			fmt.Fprint(h.conn, "+OK\r\n")
 		}
 	}
 
