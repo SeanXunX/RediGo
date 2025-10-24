@@ -42,6 +42,7 @@ func (h *ConnHandler) readCMD() {
 	for {
 		parts, err := resp.DecodeArray(reader)
 		if err == io.EOF {
+			log.Println("Received EOF")
 			return
 		} else if err != nil {
 			log.Println(err.Error())
@@ -67,6 +68,8 @@ func (h *ConnHandler) Handle() {
 		switch strings.ToUpper(cmd.Command) {
 		case "PING":
 			fmt.Fprint(h.conn, "+PONG\r\n")
+		case "COMMAND":
+			fmt.Fprint(h.conn, "*0\r\n")
 		case "ECHO":
 			fmt.Fprintf(h.conn, "$%d\r\n%s\r\n", len(cmd.Args[0]), cmd.Args[0])
 		case "SET":
