@@ -34,6 +34,10 @@ func EncodeArray(l []string) (res []byte) {
 	return
 }
 
+func EncodeEmptyArray() []byte {
+	return []byte("*0\r\n")
+}
+
 func EncodeNullArray() (res []byte) {
 	res = fmt.Append(res, "*-1\r\n")
 	return
