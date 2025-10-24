@@ -48,25 +48,25 @@ func (h *ConnHandler) Handle() {
 	go h.readCMD()
 
 	for cmd := range h.in {
-		h.run(cmd)
+		res := h.run(cmd)
+		h.conn.Write(res)
 	}
 }
 
-func (h *ConnHandler) run(cmd CMD) {
+func (h *ConnHandler) run(cmd CMD) []byte {
 
 	if h.inTransaction && !resp.CmpStrNoCase(cmd.Command, "EXEC") {
 		h.commandQueue = append(h.commandQueue, cmd)
-		h.conn.Write(resp.EncodeSimpleString("QUEUED"))
-		return
+		return resp.EncodeSimpleString("QUEUED")
 	}
 
 	switch strings.ToUpper(cmd.Command) {
 	case "COMMAND":
-		fmt.Fprint(h.conn, "*0\r\n")
+		return []byte("*0\r\n")
 	case "PING":
-		fmt.Fprint(h.conn, "+PONG\r\n")
+		return []byte("+PONG\r\n")
 	case "ECHO":
-		fmt.Fprintf(h.conn, "$%d\r\n%s\r\n", len(cmd.Args[0]), cmd.Args[0])
+		return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(cmd.Args[0]), cmd.Args[0]))
 	case "SET":
 		key, value := cmd.Args[0], cmd.Args[1]
 		if len(cmd.Args) == 2 {
@@ -78,54 +78,55 @@ func (h *ConnHandler) run(cmd CMD) {
 			}
 			h.kvStore.SetExpire(key, value, t)
 		}
-		fmt.Fprint(h.conn, "+OK\r\n")
+		return []byte("+OK\r\n")
 	case "GET":
 		key := cmd.Args[0]
 		val := h.kvStore.Get(key)
 		if val != nil {
-			fmt.Fprintf(h.conn, "$%d\r\n%s\r\n", len(val.(string)), val.(string))
+			return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val.(string)), val.(string)))
 		} else {
-			fmt.Fprint(h.conn, "$-1\r\n")
+			return []byte("$-1\r\n")
 		}
 	case "RPUSH":
 		key := cmd.Args[0]
 		value := cmd.Args[1:]
 		length := h.kvStore.RPush(key, value)
-		h.conn.Write(resp.EncodeInt(length))
+		return resp.EncodeInt(length)
 	case "LPUSH":
 		key := cmd.Args[0]
 		value := cmd.Args[1:]
 		length := h.kvStore.LPush(key, value)
-		h.conn.Write(resp.EncodeInt(length))
+		return resp.EncodeInt(length)
 	case "LRANGE":
 		key := cmd.Args[0]
 		start, _ := strconv.Atoi(cmd.Args[1])
 		stop, _ := strconv.Atoi(cmd.Args[2])
 		l := h.kvStore.LRange(key, start, stop)
-		h.conn.Write(resp.EncodeArray(l))
+		return resp.EncodeArray(l)
 	case "LLEN":
 		key := cmd.Args[0]
 		length := h.kvStore.LLen(key)
-		h.conn.Write(resp.EncodeInt(length))
+		return resp.EncodeInt(length)
 	case "LPOP":
-		h.handleLPOP(cmd)
+		return h.handleLPOP(cmd)
 	case "BLPOP":
-		h.handleBLPOP(cmd)
+		return h.handleBLPOP(cmd)
 	case "TYPE":
-		h.handleType(cmd)
+		return h.handleType(cmd)
 	case "XADD":
-		h.handleXADD(cmd)
+		return h.handleXADD(cmd)
 	case "XRANGE":
-		h.handleXRANGE(cmd)
+		return h.handleXRANGE(cmd)
 	case "XREAD":
-		h.handleXREAD(cmd)
+		return h.handleXREAD(cmd)
 	case "INCR":
-		h.handleINCR(cmd)
+		return h.handleINCR(cmd)
 	case "MULTI":
-		h.handleMULTI()
+		return h.handleMULTI()
 	case "EXEC":
-		h.handleEXEC()
+		return h.handleEXEC()
 	}
+	return []byte{}
 }
 
 func (h *ConnHandler) readCMD() {
@@ -150,7 +151,7 @@ func (h *ConnHandler) readCMD() {
 	}
 }
 
-func (h *ConnHandler) handleLPOP(cmd CMD) {
+func (h *ConnHandler) handleLPOP(cmd CMD) []byte {
 	key := cmd.Args[0]
 	var elem any
 
@@ -163,19 +164,19 @@ func (h *ConnHandler) handleLPOP(cmd CMD) {
 	}
 
 	if elem == nil {
-		h.conn.Write(resp.EncodeNullBulkString())
-		return
+		return resp.EncodeNullBulkString()
 	}
 
 	switch v := elem.(type) {
 	case string:
-		h.conn.Write(resp.EncodeBulkString(v))
+		return resp.EncodeBulkString(v)
 	case []string:
-		h.conn.Write(resp.EncodeArray(v))
+		return resp.EncodeArray(v)
 	}
+	return []byte{}
 }
 
-func (h *ConnHandler) handleBLPOP(cmd CMD) {
+func (h *ConnHandler) handleBLPOP(cmd CMD) []byte {
 	key := cmd.Args[0]
 	seconds, ok := strconv.ParseFloat(cmd.Args[1], 64)
 	if ok != nil {
@@ -185,20 +186,19 @@ func (h *ConnHandler) handleBLPOP(cmd CMD) {
 
 	elem := h.kvStore.BLPop(key, timeout)
 	if elem == nil {
-		h.conn.Write(resp.EncodeNullArray())
-		return
+		return resp.EncodeNullArray()
 	}
 	res := []string{key, elem.(string)}
-	h.conn.Write(resp.EncodeArray(res))
+	return resp.EncodeArray(res)
 }
 
-func (h *ConnHandler) handleType(cmd CMD) {
+func (h *ConnHandler) handleType(cmd CMD) []byte {
 	key := cmd.Args[0]
 	t := h.kvStore.Type(key)
-	h.conn.Write(resp.EncodeSimpleString(t))
+	return resp.EncodeSimpleString(t)
 }
 
-func (h *ConnHandler) handleXADD(cmd CMD) {
+func (h *ConnHandler) handleXADD(cmd CMD) []byte {
 	key := cmd.Args[0]
 	id := cmd.Args[1]
 	data := map[string]string{}
@@ -209,21 +209,23 @@ func (h *ConnHandler) handleXADD(cmd CMD) {
 	}
 	res, t := h.kvStore.XAdd(key, id, data)
 	if t == kv.ErrorType {
-		h.conn.Write(resp.EncodeSimpleError(res))
+		return resp.EncodeSimpleError(res)
 	} else if t == kv.StringType {
-		h.conn.Write(resp.EncodeBulkString(res))
+		return resp.EncodeBulkString(res)
+	} else {
+		return []byte{}
 	}
 }
 
-func (h *ConnHandler) handleXRANGE(cmd CMD) {
+func (h *ConnHandler) handleXRANGE(cmd CMD) []byte {
 	key := cmd.Args[0]
 	id1, id2 := cmd.Args[1], cmd.Args[2]
 
 	resEntries := h.kvStore.XRange(key, id1, id2)
-	h.conn.Write(resp.EncodeStreamEntries(resEntries))
+	return resp.EncodeStreamEntries(resEntries)
 }
 
-func (h *ConnHandler) handleXREAD(cmd CMD) {
+func (h *ConnHandler) handleXREAD(cmd CMD) []byte {
 	count := -1
 	if resp.CmpStrNoCase(cmd.Args[0], "COUNT") {
 		count, _ = strconv.Atoi(cmd.Args[1])
@@ -261,37 +263,48 @@ func (h *ConnHandler) handleXREAD(cmd CMD) {
 		}
 		resEntries := h.kvStore.XRead(keys, ids, count, isBlock, timeout)
 		if resEntries == nil {
-			h.conn.Write(resp.EncodeNullArray())
-			return
+			return resp.EncodeNullArray()
 		}
-		h.conn.Write(resp.EncodeStreamEntriesWithKeys(keys, resEntries))
+		return resp.EncodeStreamEntriesWithKeys(keys, resEntries)
 	}
+	return []byte{}
 }
 
-func (h *ConnHandler) handleINCR(cmd CMD) {
+func (h *ConnHandler) handleINCR(cmd CMD) []byte {
 	key := cmd.Args[0]
 	res, t := h.kvStore.Incr(key)
 
 	if t == kv.ErrorType {
-		h.conn.Write(resp.EncodeSimpleError(res.(string)))
+		return resp.EncodeSimpleError(res.(string))
 	}
 
-	h.conn.Write(resp.EncodeInt64(res.(int64)))
+	return resp.EncodeInt64(res.(int64))
 }
 
-func (h *ConnHandler) handleMULTI() {
+func (h *ConnHandler) handleMULTI() []byte {
 	h.inTransaction = true
-	fmt.Fprint(h.conn, "+OK\r\n")
+	return []byte("+OK\r\n")
 }
 
-func (h *ConnHandler) handleEXEC() {
+func (h *ConnHandler) handleEXEC() []byte {
 	if !h.inTransaction {
-		fmt.Fprint(h.conn, string(resp.EncodeSimpleError("EXEC without MULTI")))
-		return
+		return resp.EncodeSimpleError("EXEC without MULTI")
+
 	}
-	defer func() { h.inTransaction = false }()
+	defer func() {
+		h.inTransaction = false
+		h.commandQueue = h.commandQueue[len(h.commandQueue):]
+	}()
 	if len(h.commandQueue) == 0 {
-		h.conn.Write(resp.EncodeEmptyArray())
-		return
+		return resp.EncodeEmptyArray()
 	}
+
+	h.inTransaction = false
+
+	res := []byte{}
+	res = fmt.Appendf(res, "*%d\r\n", len(h.commandQueue))
+	for _, cmd := range h.commandQueue {
+		res = append(res, h.run(cmd)...)
+	}
+	return res
 }
