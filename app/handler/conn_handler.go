@@ -48,6 +48,11 @@ func (h *ConnHandler) Handle() {
 	go h.readCMD()
 
 	for cmd := range h.in {
+		if h.inTransaction {
+			h.commandQueue = append(h.commandQueue, cmd)
+			h.conn.Write(resp.EncodeSimpleString("QUEUED"))
+			continue
+		}
 		h.run(cmd)
 	}
 }
