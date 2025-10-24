@@ -126,7 +126,7 @@ func (h *ConnHandler) Handle() {
 		case "MULTI":
 			fmt.Fprint(h.conn, "+OK\r\n")
 		case "EXEC":
-			fmt.Fprint(h.conn, resp.EncodeSimpleError("EXEC without MULTI"))
+			fmt.Fprint(h.conn, string(resp.EncodeSimpleError("EXEC without MULTI")))
 		}
 	}
 
