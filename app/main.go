@@ -12,6 +12,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/handler"
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"golang.org/x/tools/go/analysis/passes/defers"
 )
 
 func main() {
@@ -67,7 +68,13 @@ func handShake(replicaof string, port int) {
 		log.Println("Failed to connect")
 		return
 	}
-	conn.Write(resp.EncodeArray([]string{"PING"}))
+	defer conn.Close()
+	buf := make([]byte, 1024)
+	commands := []string{"PING"}
+	conn.Write(resp.EncodeArray(commands))
+	conn.Read(buf)
 	conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", strconv.Itoa(port)}))
+	conn.Read(buf)
 	conn.Write(resp.EncodeArray([]string{"REPLCONF", "capa", "psync2"}))
+	conn.Read(buf)
 }
