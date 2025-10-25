@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -15,7 +16,13 @@ func main() {
 
 	// Uncomment this block to pass the first stage
 
-	l, err := net.Listen("tcp", "0.0.0.0:6379")
+	port := flag.Int("port", 6379, "server port")
+
+	flag.Parse()
+
+	addr := fmt.Sprintf("localhost:%d", *port)
+
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)

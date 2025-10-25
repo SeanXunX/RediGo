@@ -1,2 +1,6 @@
 *.rdb
 TODO.md
+
+tmp/
+
+.air.toml
