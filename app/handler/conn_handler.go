@@ -55,7 +55,7 @@ func (h *ConnHandler) Handle() {
 
 func (h *ConnHandler) run(cmd CMD) []byte {
 
-	if h.inTransaction && !resp.CmpStrNoCase(cmd.Command, "EXEC") {
+	if h.inTransaction && !resp.CmpStrNoCase(cmd.Command, "EXEC") && !resp.CmpStrNoCase(cmd.Command, "DISCARD") {
 		h.commandQueue = append(h.commandQueue, cmd)
 		return resp.EncodeSimpleString("QUEUED")
 	}
@@ -125,8 +125,11 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleMULTI()
 	case "EXEC":
 		return h.handleEXEC()
+	case "DISCARD":
+		return h.handleDISCARD()
+	default:
+		return []byte{}
 	}
-	return []byte{}
 }
 
 func (h *ConnHandler) readCMD() {
@@ -307,4 +310,13 @@ func (h *ConnHandler) handleEXEC() []byte {
 		res = append(res, h.run(cmd)...)
 	}
 	return res
+}
+
+func (h *ConnHandler) handleDISCARD() []byte {
+	if !h.inTransaction {
+		return resp.EncodeSimpleError("DISCARD without MULTI")
+	}
+	h.inTransaction = false
+	h.commandQueue = h.commandQueue[len(h.commandQueue):]
+	return []byte("+OK\r\n")
 }
