@@ -67,8 +67,7 @@ func handShake(replicaof string, port int) {
 		log.Println("Failed to connect")
 		return
 	}
-	commands := []string{"PING"}
-	conn.Write(resp.EncodeArray(commands))
+	conn.Write(resp.EncodeArray([]string{"PING"}))
 	conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", strconv.Itoa(port)}))
 	conn.Write(resp.EncodeArray([]string{"REPLCONF", "capa", "psync2"}))
 }
