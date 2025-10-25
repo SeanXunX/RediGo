@@ -327,11 +327,22 @@ func (h *ConnHandler) handleDISCARD() []byte {
 }
 
 func (h *ConnHandler) handleINFO(cmd CMD) []byte {
+	res := []byte{}
 	if len(cmd.Args) > 0 {
 		switch strings.ToLower(cmd.Args[0]) {
 		case "replication":
-			return resp.EncodeBulkString(fmt.Sprintf("%s:%s", "role", h.serverInfo["role"]))
+			infoStr := fmt.Sprintf(`# Replication
+role:%s
+master_replid:%s
+master_repl_offset:%s
+`,
+				h.serverInfo["role"],
+				h.serverInfo["master_replid"],
+				h.serverInfo["master_repl_offset"],
+			)
+
+			res = resp.EncodeBulkString(infoStr)
 		}
 	}
-	return []byte{}
+	return res
 }
