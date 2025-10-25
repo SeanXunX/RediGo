@@ -127,6 +127,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleEXEC()
 	case "DISCARD":
 		return h.handleDISCARD()
+	case "INFO":
+		return h.handleINFO(cmd)
 	default:
 		return []byte{}
 	}
@@ -319,4 +321,14 @@ func (h *ConnHandler) handleDISCARD() []byte {
 	h.inTransaction = false
 	h.commandQueue = h.commandQueue[len(h.commandQueue):]
 	return []byte("+OK\r\n")
+}
+
+func (h *ConnHandler) handleINFO(cmd CMD) []byte {
+	if len(cmd.Args) > 0 {
+		switch strings.ToLower(cmd.Args[0]) {
+		case "replication":
+			return resp.EncodeBulkString("role:master")
+		}
+	}
+	return []byte{}
 }
