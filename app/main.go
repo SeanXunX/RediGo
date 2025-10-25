@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/handler"
@@ -34,7 +35,7 @@ func main() {
 	var role string = "master"
 	if len(*replicaof) > 0 {
 		role = "slave"
-		handShake(*replicaof)
+		handShake(*replicaof, *port)
 	}
 	serverInfo["role"] = role
 	serverInfo["master_replid"] = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
@@ -54,7 +55,7 @@ func main() {
 	}
 }
 
-func handShake(replicaof string) {
+func handShake(replicaof string, port int) {
 	parts := strings.Split(replicaof, " ")
 	if len(parts) != 2 {
 		log.Println("Invalid master address: ", replicaof)
@@ -68,4 +69,6 @@ func handShake(replicaof string) {
 	}
 	commands := []string{"PING"}
 	conn.Write(resp.EncodeArray(commands))
+	conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", strconv.Itoa(port)}))
+	conn.Write(resp.EncodeArray([]string{"REPLCONF", "capa", "psync2"}))
 }
