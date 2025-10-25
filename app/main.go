@@ -3,21 +3,22 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/handler"
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
 
-	// Uncomment this block to pass the first stage
-
 	port := flag.Int("port", 6379, "server port")
-	replicaof := flag.String("replicaof", "master", "replication of")
+	replicaof := flag.String("replicaof", "", "replication of")
 
 	flag.Parse()
 
@@ -31,8 +32,9 @@ func main() {
 
 	serverInfo := make(map[string]string)
 	var role string = "master"
-	if *replicaof != "master" {
+	if len(*replicaof) > 0 {
 		role = "slave"
+		handShake(*replicaof)
 	}
 	serverInfo["role"] = role
 	serverInfo["master_replid"] = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
@@ -50,4 +52,20 @@ func main() {
 		h := handler.NewConnHandler(conn, kvStore, serverInfo)
 		go h.Handle()
 	}
+}
+
+func handShake(replicaof string) {
+	parts := strings.Split(replicaof, " ")
+	if len(parts) != 2 {
+		log.Println("Invalid master address: ", replicaof)
+		return
+	}
+	masterAddr := net.JoinHostPort(parts[0], parts[1])
+	conn, err := net.Dial("tcp", masterAddr)
+	if err != nil {
+		log.Println("Failed to connect")
+		return
+	}
+	commands := []string{"PING"}
+	conn.Write(resp.EncodeArray(commands))
 }
