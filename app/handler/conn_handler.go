@@ -132,6 +132,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleDISCARD()
 	case "INFO":
 		return h.handleINFO(cmd)
+	case "REPLCONF":
+		return h.handleREPLCONF()
 	default:
 		return []byte{}
 	}
@@ -345,4 +347,8 @@ master_repl_offset:%s
 		}
 	}
 	return res
+}
+
+func (h *ConnHandler) handleREPLCONF() []byte {
+	return []byte("+OK\r\n")
 }
