@@ -134,6 +134,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleINFO(cmd)
 	case "REPLCONF":
 		return h.handleREPLCONF()
+	case "PSYNC":
+		return h.handlePSYNC(cmd)
 	default:
 		return []byte{}
 	}
@@ -351,4 +353,9 @@ master_repl_offset:%s
 
 func (h *ConnHandler) handleREPLCONF() []byte {
 	return []byte("+OK\r\n")
+}
+
+func (h *ConnHandler) handlePSYNC(cmd CMD) []byte {
+	res := fmt.Sprintf("FULLRESYNC %s 0", h.serverInfo["master_replid"])
+	return resp.EncodeSimpleString(res)
 }
