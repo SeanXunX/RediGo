@@ -14,11 +14,16 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
+type ServerInfo map[string]string
+
+var serverInfo = make(ServerInfo)
+
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
 
 	port := flag.Int("port", 6379, "server port")
+	serverInfo["port"] = strconv.Itoa(*port)
 	replicaof := flag.String("replicaof", "", "replication of")
 
 	flag.Parse()
@@ -31,11 +36,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	serverInfo := make(map[string]string)
 	var role string = "master"
 	if len(*replicaof) > 0 {
 		role = "slave"
-		handShake(*replicaof, *port)
+		handShake(*replicaof)
 	}
 	serverInfo["role"] = role
 	serverInfo["master_replid"] = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
@@ -55,7 +59,7 @@ func main() {
 	}
 }
 
-func handShake(replicaof string, port int) {
+func handShake(replicaof string) {
 	parts := strings.Split(replicaof, " ")
 	if len(parts) != 2 {
 		log.Println("Invalid master address: ", replicaof)
@@ -69,11 +73,12 @@ func handShake(replicaof string, port int) {
 	}
 	defer conn.Close()
 	buf := make([]byte, 1024)
-	commands := []string{"PING"}
-	conn.Write(resp.EncodeArray(commands))
+	conn.Write(resp.EncodeArray([]string{"PING"}))
 	conn.Read(buf)
-	conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", strconv.Itoa(port)}))
+	conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", serverInfo["port"]}))
 	conn.Read(buf)
 	conn.Write(resp.EncodeArray([]string{"REPLCONF", "capa", "psync2"}))
+	conn.Read(buf)
+	conn.Write(resp.EncodeArray([]string{"PSYNC", "?", "-1"}))
 	conn.Read(buf)
 }
