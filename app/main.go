@@ -23,12 +23,12 @@ func main() {
 	fmt.Println("Logs from your program will appear here!")
 
 	port := flag.Int("port", 6379, "server port")
-	serverInfo["port"] = strconv.Itoa(*port)
 	replicaof := flag.String("replicaof", "", "replication of")
 
 	flag.Parse()
 
 	addr := fmt.Sprintf("localhost:%d", *port)
+	serverInfo["port"] = strconv.Itoa(*port)
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
