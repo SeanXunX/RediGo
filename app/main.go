@@ -12,7 +12,6 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/handler"
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
-	"golang.org/x/tools/go/analysis/passes/defers"
 )
 
 func main() {
