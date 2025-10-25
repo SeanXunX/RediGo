@@ -91,3 +91,9 @@ func EncodeStreamEntriesWithKeys(keys []string, mulEntries [][]kv.StreamEntry) (
 	res = append(cntLine, res...)
 	return
 }
+
+func EncodeRDBFile(content []byte) (res []byte) {
+	res = fmt.Appendf(res, "$%d\r\n", len(content))
+	res = append(res, content...)
+	return
+}

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bufio"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -356,6 +357,14 @@ func (h *ConnHandler) handleREPLCONF() []byte {
 }
 
 func (h *ConnHandler) handlePSYNC(cmd CMD) []byte {
-	res := fmt.Sprintf("FULLRESYNC %s 0", h.serverInfo["master_replid"])
-	return resp.EncodeSimpleString(res)
+	res := []byte{}
+	res = append(res, resp.EncodeSimpleString(fmt.Sprintf("FULLRESYNC %s 0", h.serverInfo["master_replid"]))...)
+	base64Content := "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
+	rdbBytes, err := base64.StdEncoding.DecodeString(base64Content)
+	if err != nil {
+		log.Print(err.Error())
+		return res
+	}
+	res = append(res, resp.EncodeRDBFile(rdbBytes)...)
+	return res
 }
