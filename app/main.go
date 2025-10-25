@@ -17,6 +17,7 @@ func main() {
 	// Uncomment this block to pass the first stage
 
 	port := flag.Int("port", 6379, "server port")
+	replicaof := flag.String("replicaof", "master", "replication of")
 
 	flag.Parse()
 
@@ -28,6 +29,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	serverInfo := make(map[string]string)
+	var role string = "master"
+	if *replicaof != "master" {
+		role = "slave"
+	}
+	serverInfo["role"] = role
+
 	kvStore := kv.NewKVStore()
 
 	for {
@@ -37,7 +45,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		h := handler.NewConnHandler(conn, kvStore)
+		h := handler.NewConnHandler(conn, kvStore, serverInfo)
 		go h.Handle()
 	}
 }

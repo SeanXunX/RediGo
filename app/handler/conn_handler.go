@@ -21,6 +21,8 @@ type ConnHandler struct {
 
 	inTransaction bool
 	commandQueue  []CMD
+
+	serverInfo map[string]string
 }
 
 type CMD struct {
@@ -28,13 +30,14 @@ type CMD struct {
 	Args    []string
 }
 
-func NewConnHandler(conn net.Conn, store *kv.KVStore) *ConnHandler {
+func NewConnHandler(conn net.Conn, store *kv.KVStore, serverInfo map[string]string) *ConnHandler {
 	return &ConnHandler{
 		conn:          conn,
 		in:            make(chan CMD),
 		kvStore:       store,
 		inTransaction: false,
 		commandQueue:  []CMD{},
+		serverInfo:    serverInfo,
 	}
 }
 
@@ -327,7 +330,7 @@ func (h *ConnHandler) handleINFO(cmd CMD) []byte {
 	if len(cmd.Args) > 0 {
 		switch strings.ToLower(cmd.Args[0]) {
 		case "replication":
-			return resp.EncodeBulkString("role:master")
+			return resp.EncodeBulkString(fmt.Sprintf("%s:%s", "role", h.serverInfo["role"]))
 		}
 	}
 	return []byte{}
