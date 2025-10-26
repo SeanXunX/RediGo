@@ -1,4 +1,4 @@
-package handler
+package server
 
 import (
 	"bufio"
@@ -16,14 +16,13 @@ import (
 )
 
 type ConnHandler struct {
-	conn    net.Conn
-	in      chan CMD
-	kvStore *kv.KVStore
+	conn net.Conn
+	in   chan CMD
 
 	inTransaction bool
 	commandQueue  []CMD
 
-	serverInfo map[string]string
+	s *Server
 }
 
 type CMD struct {
@@ -31,14 +30,13 @@ type CMD struct {
 	Args    []string
 }
 
-func NewConnHandler(conn net.Conn, store *kv.KVStore, serverInfo map[string]string) *ConnHandler {
+func NewConnHandler(conn net.Conn, s *Server) *ConnHandler {
 	return &ConnHandler{
 		conn:          conn,
 		in:            make(chan CMD),
-		kvStore:       store,
 		inTransaction: false,
 		commandQueue:  []CMD{},
-		serverInfo:    serverInfo,
+		s:             s,
 	}
 }
 
@@ -46,14 +44,20 @@ func (h *ConnHandler) close() {
 	h.conn.Close()
 }
 
-func (h *ConnHandler) Handle() {
+func (h *ConnHandler) Handle(slient bool) {
 	defer h.close()
 
 	go h.readCMD()
 
 	for cmd := range h.in {
 		res := h.run(cmd)
-		h.conn.Write(res)
+		if !slient {
+			h.conn.Write(res)
+		}
+		for _, slave := range h.s.SlaveConns {
+			strs := append([]string{cmd.Command}, cmd.Args...)
+			slave.Write(resp.EncodeArray(strs))
+		}
 	}
 }
 
@@ -74,18 +78,18 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 	case "SET":
 		key, value := cmd.Args[0], cmd.Args[1]
 		if len(cmd.Args) == 2 {
-			h.kvStore.Set(key, value)
+			h.s.KVStore.Set(key, value)
 		} else if len(cmd.Args) == 4 {
 			t, _ := strconv.Atoi(cmd.Args[3])
 			if strings.ToUpper(cmd.Args[2]) == "EX" {
 				t *= 1000
 			}
-			h.kvStore.SetExpire(key, value, t)
+			h.s.KVStore.SetExpire(key, value, t)
 		}
 		return []byte("+OK\r\n")
 	case "GET":
 		key := cmd.Args[0]
-		val := h.kvStore.Get(key)
+		val := h.s.KVStore.Get(key)
 		if val != nil {
 			return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val.(string)), val.(string)))
 		} else {
@@ -94,22 +98,22 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 	case "RPUSH":
 		key := cmd.Args[0]
 		value := cmd.Args[1:]
-		length := h.kvStore.RPush(key, value)
+		length := h.s.KVStore.RPush(key, value)
 		return resp.EncodeInt(length)
 	case "LPUSH":
 		key := cmd.Args[0]
 		value := cmd.Args[1:]
-		length := h.kvStore.LPush(key, value)
+		length := h.s.KVStore.LPush(key, value)
 		return resp.EncodeInt(length)
 	case "LRANGE":
 		key := cmd.Args[0]
 		start, _ := strconv.Atoi(cmd.Args[1])
 		stop, _ := strconv.Atoi(cmd.Args[2])
-		l := h.kvStore.LRange(key, start, stop)
+		l := h.s.KVStore.LRange(key, start, stop)
 		return resp.EncodeArray(l)
 	case "LLEN":
 		key := cmd.Args[0]
-		length := h.kvStore.LLen(key)
+		length := h.s.KVStore.LLen(key)
 		return resp.EncodeInt(length)
 	case "LPOP":
 		return h.handleLPOP(cmd)
@@ -136,7 +140,7 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 	case "REPLCONF":
 		return h.handleREPLCONF()
 	case "PSYNC":
-		return h.handlePSYNC(cmd)
+		return h.handlePSYNC()
 	default:
 		return []byte{}
 	}
@@ -170,10 +174,10 @@ func (h *ConnHandler) handleLPOP(cmd CMD) []byte {
 
 	switch len(cmd.Args) {
 	case 1:
-		elem = h.kvStore.LPop(key)
+		elem = h.s.KVStore.LPop(key)
 	case 2:
 		num, _ := strconv.Atoi(cmd.Args[1])
-		elem = h.kvStore.LPopN(key, num)
+		elem = h.s.KVStore.LPopN(key, num)
 	}
 
 	if elem == nil {
@@ -197,7 +201,7 @@ func (h *ConnHandler) handleBLPOP(cmd CMD) []byte {
 	}
 	timeout := time.Duration(seconds * float64(time.Second))
 
-	elem := h.kvStore.BLPop(key, timeout)
+	elem := h.s.KVStore.BLPop(key, timeout)
 	if elem == nil {
 		return resp.EncodeNullArray()
 	}
@@ -207,7 +211,7 @@ func (h *ConnHandler) handleBLPOP(cmd CMD) []byte {
 
 func (h *ConnHandler) handleType(cmd CMD) []byte {
 	key := cmd.Args[0]
-	t := h.kvStore.Type(key)
+	t := h.s.KVStore.Type(key)
 	return resp.EncodeSimpleString(t)
 }
 
@@ -220,7 +224,7 @@ func (h *ConnHandler) handleXADD(cmd CMD) []byte {
 		k, v := cmd.Args[i], cmd.Args[i+1]
 		data[k] = v
 	}
-	res, t := h.kvStore.XAdd(key, id, data)
+	res, t := h.s.KVStore.XAdd(key, id, data)
 	if t == kv.ErrorType {
 		return resp.EncodeSimpleError(res)
 	} else if t == kv.StringType {
@@ -234,7 +238,7 @@ func (h *ConnHandler) handleXRANGE(cmd CMD) []byte {
 	key := cmd.Args[0]
 	id1, id2 := cmd.Args[1], cmd.Args[2]
 
-	resEntries := h.kvStore.XRange(key, id1, id2)
+	resEntries := h.s.KVStore.XRange(key, id1, id2)
 	return resp.EncodeStreamEntries(resEntries)
 }
 
@@ -274,7 +278,7 @@ func (h *ConnHandler) handleXREAD(cmd CMD) []byte {
 			keys[i] = cmd.Args[baseIdx+i+1]
 			ids[i] = cmd.Args[baseIdx+num+i+1]
 		}
-		resEntries := h.kvStore.XRead(keys, ids, count, isBlock, timeout)
+		resEntries := h.s.KVStore.XRead(keys, ids, count, isBlock, timeout)
 		if resEntries == nil {
 			return resp.EncodeNullArray()
 		}
@@ -285,7 +289,7 @@ func (h *ConnHandler) handleXREAD(cmd CMD) []byte {
 
 func (h *ConnHandler) handleINCR(cmd CMD) []byte {
 	key := cmd.Args[0]
-	res, t := h.kvStore.Incr(key)
+	res, t := h.s.KVStore.Incr(key)
 
 	if t == kv.ErrorType {
 		return resp.EncodeSimpleError(res.(string))
@@ -337,13 +341,13 @@ func (h *ConnHandler) handleINFO(cmd CMD) []byte {
 		switch strings.ToLower(cmd.Args[0]) {
 		case "replication":
 			infoStr := fmt.Sprintf(`# Replication
-role:%s
+role:%d
 master_replid:%s
-master_repl_offset:%s
+master_repl_offset:%d
 `,
-				h.serverInfo["role"],
-				h.serverInfo["master_replid"],
-				h.serverInfo["master_repl_offset"],
+				h.s.Port,
+				h.s.MasterReplId,
+				h.s.MasterReplOffset,
 			)
 
 			res = resp.EncodeBulkString(infoStr)
@@ -356,9 +360,9 @@ func (h *ConnHandler) handleREPLCONF() []byte {
 	return []byte("+OK\r\n")
 }
 
-func (h *ConnHandler) handlePSYNC(cmd CMD) []byte {
+func (h *ConnHandler) handlePSYNC() []byte {
 	res := []byte{}
-	res = append(res, resp.EncodeSimpleString(fmt.Sprintf("FULLRESYNC %s 0", h.serverInfo["master_replid"]))...)
+	res = append(res, resp.EncodeSimpleString(fmt.Sprintf("FULLRESYNC %s 0", h.s.MasterReplId))...)
 	base64Content := "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
 	rdbBytes, err := base64.StdEncoding.DecodeString(base64Content)
 	if err != nil {
@@ -366,5 +370,8 @@ func (h *ConnHandler) handlePSYNC(cmd CMD) []byte {
 		return res
 	}
 	res = append(res, resp.EncodeRDBFile(rdbBytes)...)
+
+	h.s.SlaveConns = append(h.s.SlaveConns, h.conn)
+
 	return res
 }
