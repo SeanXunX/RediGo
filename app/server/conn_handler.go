@@ -341,11 +341,11 @@ func (h *ConnHandler) handleINFO(cmd CMD) []byte {
 		switch strings.ToLower(cmd.Args[0]) {
 		case "replication":
 			infoStr := fmt.Sprintf(`# Replication
-role:%d
+role:%s
 master_replid:%s
 master_repl_offset:%d
 `,
-				h.s.Port,
+				h.s.Role,
 				h.s.MasterReplId,
 				h.s.MasterReplOffset,
 			)
