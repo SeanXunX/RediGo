@@ -26,8 +26,9 @@ type ConnHandler struct {
 }
 
 type CMD struct {
-	Command string
-	Args    []string
+	Command   string
+	Args      []string
+	RespBytes int
 }
 
 var writeCommands = map[string]bool{
@@ -68,15 +69,23 @@ func isReplGetAck(cmd CMD) bool {
 	return strings.EqualFold(cmd.Command, "REPLCONF") && strings.EqualFold(cmd.Args[0], "GETACK")
 }
 
-func (h *ConnHandler) Handle(slient bool) {
+func (h *ConnHandler) Handle(isSlave bool) {
 	defer h.close()
 
 	go h.readCMD()
 
 	for cmd := range h.in {
+		// increment slave received bytes
+		h.s.SlaveReplOffset += cmd.RespBytes
+
+		// master propagate write commands to its slavers
 		h.propagateCMD(cmd)
+
+		// execute cmd
 		res := h.run(cmd)
-		if !slient || isReplGetAck(cmd) {
+
+		// Master or specific commands should write back
+		if !isSlave || isReplGetAck(cmd) {
 			h.conn.Write(res)
 		}
 	}
@@ -180,7 +189,7 @@ func (h *ConnHandler) propagateCMD(cmd CMD) {
 func (h *ConnHandler) readCMD() {
 	reader := bufio.NewReader(h.conn)
 	for {
-		parts, err := resp.DecodeArray(reader)
+		parts, n, err := resp.DecodeArray(reader)
 		if err == io.EOF {
 			log.Println("Received EOF")
 			return
@@ -188,7 +197,7 @@ func (h *ConnHandler) readCMD() {
 			log.Println(err.Error())
 			continue
 		}
-		cmd := CMD{}
+		cmd := CMD{RespBytes: n}
 		if len(parts) > 0 {
 			cmd.Command = parts[0]
 			if len(parts) > 1 {
@@ -389,7 +398,7 @@ master_repl_offset:%d
 
 func (h *ConnHandler) handleREPLCONF(cmd CMD) []byte {
 	if strings.EqualFold(cmd.Args[0], "GETACK") && strings.EqualFold(cmd.Args[1], "*") {
-		return resp.EncodeArray([]string{"REPLCONF", "ACK", "0"})
+		return resp.EncodeArray([]string{"REPLCONF", "ACK", fmt.Sprintf("%d", h.s.SlaveReplOffset)})
 	}
 	return []byte("+OK\r\n")
 }

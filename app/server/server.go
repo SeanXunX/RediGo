@@ -20,6 +20,8 @@ type Server struct {
 
 	Replicaof string
 
+	SlaveReplOffset int
+
 	KVStore *kv.KVStore
 
 	SlaveConns []net.Conn
