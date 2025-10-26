@@ -14,7 +14,6 @@ import (
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
-	"golang.org/x/text/cases"
 )
 
 type ConnHandler struct {
