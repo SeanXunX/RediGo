@@ -77,6 +77,8 @@ func (h *ConnHandler) Handle(slient bool) {
 		h.propagateCMD(cmd)
 		res := h.run(cmd)
 		if !slient || isReplGetAck(cmd) {
+			fmt.Printf("[debug] Send res back by cmd %#v\n", cmd)
+			fmt.Printf("[debug] isReplGetAck = %v\n", isReplGetAck(cmd))
 			h.conn.Write(res)
 		}
 	}
