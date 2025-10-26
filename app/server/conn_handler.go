@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"golang.org/x/text/cases"
 )
 
 type ConnHandler struct {
@@ -83,11 +85,7 @@ func (h *ConnHandler) Handle(isSlave bool) {
 		res := h.run(cmd)
 
 		// Master or specific commands should write back
-		log.Println(">>>>>>> Before possible writing")
 		if !isSlave || isReplGetAck(cmd) {
-			if isReplGetAck(cmd) {
-				log.Println(">>>>>>> Slave received getack")
-			}
 			h.conn.Write(res)
 		}
 
@@ -176,6 +174,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleREPLCONF(cmd)
 	case "PSYNC":
 		return h.handlePSYNC()
+	case "WAIT":
+		return h.handleWAIT(cmd)
 	default:
 		return []byte{}
 	}
@@ -422,4 +422,29 @@ func (h *ConnHandler) handlePSYNC() []byte {
 	h.s.SlaveConns = append(h.s.SlaveConns, h.conn)
 
 	return res
+}
+
+func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
+	numReplcas, err := strconv.Atoi(cmd.Args[0])
+
+	if numReplcas == 0 {
+		return resp.EncodeInt(0)
+	}
+
+	if err != nil {
+		log.Print(err.Error())
+		return []byte{}
+	}
+	timeoutMs, err := strconv.Atoi(cmd.Args[1])
+	timeout := time.Microsecond * time.Duration(timeoutMs)
+
+	tCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	select {
+	case <-tCtx.Done():
+
+	}
+
+	return []byte{}
 }

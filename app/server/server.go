@@ -69,31 +69,6 @@ func (s *Server) Run() {
 
 }
 
-//	func (s *Server) SendHandShake() {
-//		parts := strings.Split(s.Replicaof, " ")
-//		if len(parts) != 2 {
-//			log.Println("Invalid master address: ", s.Replicaof)
-//			return
-//		}
-//		masterAddr := net.JoinHostPort(parts[0], parts[1])
-//		conn, err := net.Dial("tcp", masterAddr)
-//		if err != nil {
-//			log.Println("Failed to connect")
-//			return
-//		}
-//		buf := make([]byte, 1024)
-//		conn.Write(resp.EncodeArray([]string{"PING"}))
-//		conn.Read(buf)
-//		conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", fmt.Sprintf("%d", s.Port)}))
-//		conn.Read(buf)
-//		conn.Write(resp.EncodeArray([]string{"REPLCONF", "capa", "psync2"}))
-//		conn.Read(buf)
-//		conn.Write(resp.EncodeArray([]string{"PSYNC", "?", "-1"}))
-//		conn.Read(buf)
-//
-//		h := NewConnHandler(conn, s)
-//		go h.Handle(true)
-//	}
 func (s *Server) SendHandShake() {
 	parts := strings.Split(s.Replicaof, " ")
 	if len(parts) != 2 {
