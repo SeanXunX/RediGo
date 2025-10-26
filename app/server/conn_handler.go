@@ -30,6 +30,25 @@ type CMD struct {
 	Args    []string
 }
 
+var writeCommands = map[string]bool{
+	"SET":      true,
+	"DEL":      true,
+	"INCR":     true,
+	"DECR":     true,
+	"RPUSH":    true,
+	"LPUSH":    true,
+	"LPOP":     true,
+	"RPOP":     true,
+	"XADD":     true,
+	"HMSET":    true,
+	"HSET":     true,
+	"HDEL":     true,
+	"EXPIRE":   true,
+	"PEXPIRE":  true,
+	"FLUSHDB":  true,
+	"FLUSHALL": true,
+}
+
 func NewConnHandler(conn net.Conn, s *Server) *ConnHandler {
 	return &ConnHandler{
 		conn:          conn,
@@ -50,10 +69,7 @@ func (h *ConnHandler) Handle(slient bool) {
 	go h.readCMD()
 
 	for cmd := range h.in {
-		for _, slave := range h.s.SlaveConns {
-			strs := append([]string{cmd.Command}, cmd.Args...)
-			slave.Write(resp.EncodeArray(strs))
-		}
+		h.propagateCMD(cmd)
 		res := h.run(cmd)
 		if !slient {
 			h.conn.Write(res)
@@ -143,6 +159,16 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handlePSYNC()
 	default:
 		return []byte{}
+	}
+}
+
+func (h *ConnHandler) propagateCMD(cmd CMD) {
+	if !writeCommands[strings.ToUpper(cmd.Command)] {
+		return
+	}
+	for _, slave := range h.s.SlaveConns {
+		strs := append([]string{cmd.Command}, cmd.Args...)
+		slave.Write(resp.EncodeArray(strs))
 	}
 }
 
