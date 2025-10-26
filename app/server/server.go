@@ -85,7 +85,6 @@ func (s *Server) SendHandShake() {
 	conn.Read(buf)
 	conn.Write(resp.EncodeArray([]string{"PSYNC", "?", "-1"}))
 	conn.Read(buf)
-	conn.Read(buf)
 
 	h := NewConnHandler(conn, s)
 	go h.Handle(true)
