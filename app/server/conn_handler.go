@@ -434,16 +434,19 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 		log.Print(err.Error())
 		return []byte{}
 	}
-	timeoutMs, err := strconv.Atoi(cmd.Args[1])
-	timeout := time.Microsecond * time.Duration(timeoutMs)
 
-	tCtx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	return resp.EncodeInt(len(h.s.SlaveConns))
 
-	select {
-	case <-tCtx.Done():
-
-	}
-
+	// timeoutMs, err := strconv.Atoi(cmd.Args[1])
+	// timeout := time.Microsecond * time.Duration(timeoutMs)
+	//
+	// tCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	// defer cancel()
+	//
+	// select {
+	// case <-tCtx.Done():
+	//
+	// }
+	//
 	return []byte{}
 }
