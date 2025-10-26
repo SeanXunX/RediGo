@@ -181,11 +181,14 @@ func (h *ConnHandler) propagateCMD(cmd CMD) {
 	if !writeCommands[strings.ToUpper(cmd.Command)] {
 		return
 	}
-	buf := make([]byte, 1024)
 	for _, slave := range h.s.SlaveConns {
 		strs := append([]string{cmd.Command}, cmd.Args...)
 		slave.Write(resp.EncodeArray(strs))
-		slave.Read(buf)
+		if isReplGetAck(cmd) {
+			log.Println("[debug] received repl getack")
+			buf := make([]byte, 1024)
+			slave.Read(buf)
+		}
 	}
 }
 
