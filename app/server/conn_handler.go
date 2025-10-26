@@ -63,6 +63,11 @@ func (h *ConnHandler) close() {
 	h.conn.Close()
 }
 
+// Slave should return its reponse when receiving "REPLCONF GETACK" from master
+func isReplGetAck(cmd CMD) bool {
+	return strings.EqualFold(cmd.Command, "REPLCONF") && strings.EqualFold(cmd.Args[0], "GETACK")
+}
+
 func (h *ConnHandler) Handle(slient bool) {
 	defer h.close()
 
@@ -71,7 +76,7 @@ func (h *ConnHandler) Handle(slient bool) {
 	for cmd := range h.in {
 		h.propagateCMD(cmd)
 		res := h.run(cmd)
-		if !slient {
+		if !slient || isReplGetAck(cmd) {
 			h.conn.Write(res)
 		}
 	}
@@ -154,7 +159,7 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 	case "INFO":
 		return h.handleINFO(cmd)
 	case "REPLCONF":
-		return h.handleREPLCONF()
+		return h.handleREPLCONF(cmd)
 	case "PSYNC":
 		return h.handlePSYNC()
 	default:
@@ -382,7 +387,10 @@ master_repl_offset:%d
 	return res
 }
 
-func (h *ConnHandler) handleREPLCONF() []byte {
+func (h *ConnHandler) handleREPLCONF(cmd CMD) []byte {
+	if strings.EqualFold(cmd.Args[0], "GETACK") && strings.EqualFold(cmd.Args[1], "*") {
+		return resp.EncodeArray([]string{"REPLCONF", "ACK", "0"})
+	}
 	return []byte("+OK\r\n")
 }
 
