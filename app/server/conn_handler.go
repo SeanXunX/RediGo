@@ -72,6 +72,7 @@ func isReplGetAck(cmd CMD) bool {
 func (h *ConnHandler) Handle(isSlave bool) {
 	defer h.close()
 
+	// Read commands from clients. Read from `h.conn`
 	go h.readCMD()
 
 	for cmd := range h.in {
@@ -180,9 +181,11 @@ func (h *ConnHandler) propagateCMD(cmd CMD) {
 	if !writeCommands[strings.ToUpper(cmd.Command)] {
 		return
 	}
+	buf := make([]byte, 1024)
 	for _, slave := range h.s.SlaveConns {
 		strs := append([]string{cmd.Command}, cmd.Args...)
 		slave.Write(resp.EncodeArray(strs))
+		slave.Read(buf)
 	}
 }
 
