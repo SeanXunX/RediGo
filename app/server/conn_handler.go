@@ -50,13 +50,13 @@ func (h *ConnHandler) Handle(slient bool) {
 	go h.readCMD()
 
 	for cmd := range h.in {
-		res := h.run(cmd)
-		if !slient {
-			h.conn.Write(res)
-		}
 		for _, slave := range h.s.SlaveConns {
 			strs := append([]string{cmd.Command}, cmd.Args...)
 			slave.Write(resp.EncodeArray(strs))
+		}
+		res := h.run(cmd)
+		if !slient {
+			h.conn.Write(res)
 		}
 	}
 }
