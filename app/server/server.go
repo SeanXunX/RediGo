@@ -1,9 +1,12 @@
 package server
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
@@ -66,28 +69,94 @@ func (s *Server) Run() {
 
 }
 
-func (s *Server) SendHandShake() {
+//	func (s *Server) SendHandShake() {
+//		parts := strings.Split(s.Replicaof, " ")
+//		if len(parts) != 2 {
+//			log.Println("Invalid master address: ", s.Replicaof)
+//			return
+//		}
+//		masterAddr := net.JoinHostPort(parts[0], parts[1])
+//		conn, err := net.Dial("tcp", masterAddr)
+//		if err != nil {
+//			log.Println("Failed to connect")
+//			return
+//		}
+//		buf := make([]byte, 1024)
+//		conn.Write(resp.EncodeArray([]string{"PING"}))
+//		conn.Read(buf)
+//		conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", fmt.Sprintf("%d", s.Port)}))
+//		conn.Read(buf)
+//		conn.Write(resp.EncodeArray([]string{"REPLCONF", "capa", "psync2"}))
+//		conn.Read(buf)
+//		conn.Write(resp.EncodeArray([]string{"PSYNC", "?", "-1"}))
+//		conn.Read(buf)
+//
+//		h := NewConnHandler(conn, s)
+//		go h.Handle(true)
+//	}
+func (s *Server) SendHandshake() {
 	parts := strings.Split(s.Replicaof, " ")
 	if len(parts) != 2 {
-		log.Println("Invalid master address: ", s.Replicaof)
+		log.Println("Invalid master address:", s.Replicaof)
 		return
 	}
+
 	masterAddr := net.JoinHostPort(parts[0], parts[1])
 	conn, err := net.Dial("tcp", masterAddr)
 	if err != nil {
-		log.Println("Failed to connect")
+		log.Println("Failed to connect to master:", err)
 		return
 	}
-	buf := make([]byte, 1024)
-	conn.Write(resp.EncodeArray([]string{"PING"}))
-	conn.Read(buf)
-	conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", fmt.Sprintf("%d", s.Port)}))
-	conn.Read(buf)
-	conn.Write(resp.EncodeArray([]string{"REPLCONF", "capa", "psync2"}))
-	conn.Read(buf)
-	conn.Write(resp.EncodeArray([]string{"PSYNC", "?", "-1"}))
-	conn.Read(buf)
 
+	reader := bufio.NewReader(conn)
+
+	// PING
+	conn.Write(resp.EncodeArray([]string{"PING"}))
+	line, _ := reader.ReadString('\n')
+	log.Println("PING response:", line)
+
+	// REPLCONF listening-port
+	conn.Write(resp.EncodeArray([]string{"REPLCONF", "listening-port", fmt.Sprintf("%d", s.Port)}))
+	line, _ = reader.ReadString('\n')
+	log.Println("REPLCONF port response:", line)
+
+	// REPLCONF capa psync2
+	conn.Write(resp.EncodeArray([]string{"REPLCONF", "capa", "psync2"}))
+	line, _ = reader.ReadString('\n')
+	log.Println("REPLCONF capa response:", line)
+
+	// PSYNC
+	conn.Write(resp.EncodeArray([]string{"PSYNC", "?", "-1"}))
+	line, _ = reader.ReadString('\n')
+	log.Println("PSYNC response:", line)
+
+	// 如果是 FULLRESYNC，则接下来是 RDB 文件
+	if strings.HasPrefix(line, "+FULLRESYNC") {
+		// 开始接收 RDB 二进制数据
+		s.ReceiveRDB(reader)
+	}
+
+	// 完成后再启动 handler 处理后续命令
 	h := NewConnHandler(conn, s)
 	go h.Handle(true)
+}
+
+func (s *Server) ReceiveRDB(reader *bufio.Reader) {
+	// RDB 文件头是 "REDIS"
+	header := make([]byte, 5)
+	_, err := io.ReadFull(reader, header)
+	if err != nil {
+		log.Println("Error reading RDB header:", err)
+		return
+	}
+	if string(header) != "REDIS" {
+		log.Println("Invalid RDB header:", string(header))
+		return
+	}
+
+	// 剩余部分直接读到文件或内存
+	f, _ := os.Create("dump.rdb")
+	defer f.Close()
+	io.Copy(f, reader)
+	log.Println("RDB file received.")
 }
