@@ -184,11 +184,6 @@ func (h *ConnHandler) propagateCMD(cmd CMD) {
 	for _, slave := range h.s.SlaveConns {
 		strs := append([]string{cmd.Command}, cmd.Args...)
 		slave.Write(resp.EncodeArray(strs))
-		if isReplGetAck(cmd) {
-			log.Println("[debug] received repl getack")
-			buf := make([]byte, 1024)
-			slave.Read(buf)
-		}
 	}
 }
 
