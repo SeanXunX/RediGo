@@ -94,7 +94,7 @@ func (s *Server) Run() {
 //		h := NewConnHandler(conn, s)
 //		go h.Handle(true)
 //	}
-func (s *Server) SendHandshake() {
+func (s *Server) SendHandShake() {
 	parts := strings.Split(s.Replicaof, " ")
 	if len(parts) != 2 {
 		log.Println("Invalid master address:", s.Replicaof)
