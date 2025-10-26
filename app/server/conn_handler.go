@@ -83,6 +83,7 @@ func (h *ConnHandler) Handle(isSlave bool) {
 		res := h.run(cmd)
 
 		// Master or specific commands should write back
+		log.Println(">>>>>>> Before possible writing")
 		if !isSlave || isReplGetAck(cmd) {
 			if isReplGetAck(cmd) {
 				log.Println(">>>>>>> Slave received getack")
