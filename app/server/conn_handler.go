@@ -76,9 +76,6 @@ func (h *ConnHandler) Handle(isSlave bool) {
 	go h.readCMD()
 
 	for cmd := range h.in {
-		// increment slave received bytes
-		h.s.SlaveReplOffset += cmd.RespBytes
-
 		// master propagate write commands to its slavers
 		h.propagateCMD(cmd)
 
@@ -89,6 +86,9 @@ func (h *ConnHandler) Handle(isSlave bool) {
 		if !isSlave || isReplGetAck(cmd) {
 			h.conn.Write(res)
 		}
+
+		// increment slave received bytes
+		h.s.SlaveReplOffset += cmd.RespBytes
 	}
 }
 
