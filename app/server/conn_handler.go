@@ -413,6 +413,8 @@ func (h *ConnHandler) handleREPLCONF(cmd CMD) []byte {
 		return resp.EncodeArray([]string{"REPLCONF", "ACK", fmt.Sprintf("%d", h.s.SlaveReplOffset)})
 	}
 	if strings.EqualFold(cmd.Args[0], "ACK") {
+		fmt.Println("[debug] Master receives ACK")
+
 		offset, _ := strconv.Atoi(cmd.Args[1])
 
 		h.s.MasterOffsetMu.RLock()
