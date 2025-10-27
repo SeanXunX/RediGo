@@ -439,17 +439,21 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	timeoutMs, err := strconv.Atoi(cmd.Args[1])
 	timeout := time.Microsecond * time.Duration(timeoutMs)
 
+	ackCh := make(chan int, len(h.s.SlaveConns))
+
+	log.Printf("[debug] before creating tCtx. numReplcas = %d, timeoutMs = %d \n", numReplcas, timeoutMs)
+
 	tCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	ackCh := make(chan int, len(h.s.SlaveConns))
-
 	// Send GETACK to slaves
 	for _, slaveConn := range h.s.SlaveConns {
+		log.Printf("[debug] in for loop, before goroutine \n")
 		go func(conn net.Conn) {
 			conn.Write(resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"}))
 			// Receive response from slave. Should be "REPLCONF ACK <offset>"
 			res, _, _ := resp.DecodeArray(bufio.NewReader(conn))
+			log.Printf("[debug] in goroutine received: %v", res)
 			offset, _ := strconv.Atoi(res[2])
 			ackCh <- offset
 		}(slaveConn)
