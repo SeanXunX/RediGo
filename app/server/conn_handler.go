@@ -486,12 +486,12 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	}
 
 	timeoutMs, err := strconv.Atoi(cmd.Args[1])
-	timeout := time.Microsecond * time.Duration(timeoutMs)
+	timeout := time.Millisecond * time.Duration(timeoutMs)
 
 	// Time stopper
 	timeoutCh := time.After(timeout)
 
-	ticker := time.NewTicker(time.Microsecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
