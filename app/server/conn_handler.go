@@ -191,7 +191,9 @@ func (h *ConnHandler) propagateCMD(cmd CMD) {
 	h.s.SlaveMu.RUnlock()
 
 	h.s.MasterOffsetMu.Lock()
+	fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v\n before offset = %d\n", cmd, h.s.MasterReplOffset)
 	h.s.MasterReplOffset += cmd.RespBytes
+	fmt.Printf("[debug] <<<<<<< increasing masteroffset, cmd = %v\n after offset = %d\n", cmd, h.s.MasterReplOffset)
 	h.s.MasterOffsetMu.Unlock()
 }
 
@@ -473,7 +475,9 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	getAckBytes := resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"})
 	defer func() {
 		h.s.MasterOffsetMu.Lock()
+		fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v\n before offset = %d\n", "gettack", h.s.MasterReplOffset)
 		h.s.MasterReplOffset += len(getAckBytes)
+		fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v\n before offset = %d\n", "gettack", h.s.MasterReplOffset)
 		h.s.MasterOffsetMu.Unlock()
 	}()
 
