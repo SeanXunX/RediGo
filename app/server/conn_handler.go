@@ -517,12 +517,13 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 }
 
 func (h *ConnHandler) handleCONFIG(cmd CMD) []byte {
+	fmt.Printf("[debug] received cmd = %+v", cmd)
 	if cmd.Args[0] == "GET" {
 		switch param := cmd.Args[1]; param {
 		case "dir":
-			return resp.EncodeBulkString(h.s.Dir)
+			return resp.EncodeArray([]string{"dir", h.s.Dir})
 		case "dbfilename":
-			return resp.EncodeBulkString(h.s.Dbfilename)
+			return resp.EncodeArray([]string{"dbfilename", h.s.Dbfilename})
 		}
 	}
 	return []byte{}
