@@ -461,9 +461,9 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	getAckBytes := resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"})
 	defer func() {
 		h.s.MasterOffsetMu.Lock()
-		fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v\n before offset = %d\n", "gettack", h.s.MasterReplOffset)
+		fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v before offset = %d\n", "gettack", h.s.MasterReplOffset)
 		h.s.MasterReplOffset += len(getAckBytes)
-		fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v\n before offset = %d\n", "gettack", h.s.MasterReplOffset)
+		fmt.Printf("[debug] <<<<<<< increasing masteroffset, cmd = %v after offset = %d\n", "gettack", h.s.MasterReplOffset)
 		h.s.MasterOffsetMu.Unlock()
 	}()
 
@@ -486,6 +486,9 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 
 	timeoutMs, err := strconv.Atoi(cmd.Args[1])
 	timeout := time.Microsecond * time.Duration(timeoutMs)
+
+	//todo
+	timeout *= 5
 
 	// Time stopper
 	timeoutCh := time.After(timeout)
