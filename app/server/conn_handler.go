@@ -452,20 +452,6 @@ func (h *ConnHandler) handlePSYNC() []byte {
 }
 
 func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
-	numReplcas, err := strconv.Atoi(cmd.Args[0])
-
-	if numReplcas == 0 {
-		return resp.EncodeInt(0)
-	}
-
-	if err != nil {
-		log.Print(err.Error())
-		return []byte{}
-	}
-
-	timeoutMs, err := strconv.Atoi(cmd.Args[1])
-	timeout := time.Microsecond * time.Duration(timeoutMs)
-
 	// Reset ack count
 	h.s.ackMu.Lock()
 	h.s.ackCnt = 0
@@ -486,6 +472,20 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 		slaveConn.Write(getAckBytes)
 	}
 	h.s.SlaveMu.RUnlock()
+
+	numReplcas, err := strconv.Atoi(cmd.Args[0])
+
+	if numReplcas == 0 {
+		return resp.EncodeInt(0)
+	}
+
+	if err != nil {
+		log.Print(err.Error())
+		return []byte{}
+	}
+
+	timeoutMs, err := strconv.Atoi(cmd.Args[1])
+	timeout := time.Microsecond * time.Duration(timeoutMs)
 
 	// Time stopper
 	timeoutCh := time.After(timeout)
