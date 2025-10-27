@@ -426,6 +426,7 @@ func (h *ConnHandler) handleREPLCONF(cmd CMD) []byte {
 
 			h.s.ackMu.Lock()
 			h.s.ackCnt++
+			fmt.Println("[debug] ackcnt increased to %d", h.s.ackCnt)
 			h.s.ackMu.Unlock()
 		}
 		return []byte{}
