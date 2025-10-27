@@ -418,9 +418,9 @@ func (h *ConnHandler) handleREPLCONF(cmd CMD) []byte {
 		offset, _ := strconv.Atoi(cmd.Args[1])
 
 		h.s.MasterOffsetMu.RLock()
+		defer h.s.MasterOffsetMu.RUnlock()
 		fmt.Printf("[debug] slaveoffset = %d, masteroffset = %d", offset, h.s.MasterReplOffset)
 		if offset >= h.s.MasterReplOffset {
-			h.s.MasterOffsetMu.RUnlock()
 
 			h.s.ackMu.Lock()
 			h.s.ackCnt++
@@ -470,14 +470,16 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	h.s.ackMu.Unlock()
 
 	// Send getack to slaves
-	h.s.SlaveMu.RLock()
-	for _, slaveConn := range h.s.SlaveConns {
-		getAckBytes := resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"})
-		slaveConn.Write(getAckBytes)
-
+	getAckBytes := resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"})
+	defer func() {
 		h.s.MasterOffsetMu.Lock()
 		h.s.MasterReplOffset += len(getAckBytes)
 		h.s.MasterOffsetMu.Unlock()
+	}()
+
+	h.s.SlaveMu.RLock()
+	for _, slaveConn := range h.s.SlaveConns {
+		slaveConn.Write(getAckBytes)
 	}
 	h.s.SlaveMu.RUnlock()
 
