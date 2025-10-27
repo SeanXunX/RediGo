@@ -496,6 +496,7 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	for {
 		select {
 		case <-timeoutCh:
+			fmt.Println("[debug] timeout!!!")
 			h.s.ackMu.RLock()
 			defer h.s.ackMu.RUnlock()
 			return resp.EncodeInt(h.s.ackCnt)
