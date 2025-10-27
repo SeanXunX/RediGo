@@ -418,6 +418,7 @@ func (h *ConnHandler) handleREPLCONF(cmd CMD) []byte {
 		offset, _ := strconv.Atoi(cmd.Args[1])
 
 		h.s.MasterOffsetMu.RLock()
+		fmt.Printf("[debug] slaveoffset = %d, masteroffset = %d", offset, h.s.MasterReplOffset)
 		if offset >= h.s.MasterReplOffset {
 			h.s.MasterOffsetMu.RUnlock()
 
