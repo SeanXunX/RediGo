@@ -453,27 +453,6 @@ func (h *ConnHandler) handlePSYNC() []byte {
 }
 
 func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
-	// Reset ack count
-	h.s.ackMu.Lock()
-	h.s.ackCnt = 0
-	h.s.ackMu.Unlock()
-
-	// Send getack to slaves
-	getAckBytes := resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"})
-	// defer func() {
-	// 	h.s.MasterOffsetMu.Lock()
-	// 	fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v before offset = %d\n", "gettack", h.s.MasterReplOffset)
-	// 	h.s.MasterReplOffset += len(getAckBytes)
-	// 	fmt.Printf("[debug] <<<<<<< increasing masteroffset, cmd = %v after offset = %d\n", "gettack", h.s.MasterReplOffset)
-	// 	h.s.MasterOffsetMu.Unlock()
-	// }()
-
-	h.s.SlaveMu.RLock()
-	for _, slaveConn := range h.s.SlaveConns {
-		slaveConn.Write(getAckBytes)
-	}
-	h.s.SlaveMu.RUnlock()
-
 	numReplcas, err := strconv.Atoi(cmd.Args[0])
 
 	if numReplcas == 0 {
@@ -485,8 +464,39 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 		return []byte{}
 	}
 
+	h.s.MasterOffsetMu.RLock()
+	masOff := h.s.MasterReplOffset
+	h.s.MasterOffsetMu.RUnlock()
+
+	if masOff == 0 {
+		h.s.SlaveMu.RLock()
+		defer h.s.SlaveMu.RUnlock()
+		return resp.EncodeInt(len(h.s.SlaveConns))
+	}
+
 	timeoutMs, err := strconv.Atoi(cmd.Args[1])
 	timeout := time.Millisecond * time.Duration(timeoutMs)
+
+	// Reset ack count
+	h.s.ackMu.Lock()
+	h.s.ackCnt = 0
+	h.s.ackMu.Unlock()
+
+	// Send getack to slaves
+	getAckBytes := resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"})
+	defer func() {
+		h.s.MasterOffsetMu.Lock()
+		fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v before offset = %d\n", "gettack", h.s.MasterReplOffset)
+		h.s.MasterReplOffset += len(getAckBytes)
+		fmt.Printf("[debug] <<<<<<< increasing masteroffset, cmd = %v after offset = %d\n", "gettack", h.s.MasterReplOffset)
+		h.s.MasterOffsetMu.Unlock()
+	}()
+
+	h.s.SlaveMu.RLock()
+	for _, slaveConn := range h.s.SlaveConns {
+		slaveConn.Write(getAckBytes)
+	}
+	h.s.SlaveMu.RUnlock()
 
 	// Time stopper
 	timeoutCh := time.After(timeout)
