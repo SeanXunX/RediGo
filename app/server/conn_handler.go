@@ -490,7 +490,7 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	// Time stopper
 	timeoutCh := time.After(timeout)
 
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
