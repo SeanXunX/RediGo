@@ -464,6 +464,9 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	timeoutMs, err := strconv.Atoi(cmd.Args[1])
 	timeout := time.Microsecond * time.Duration(timeoutMs)
 
+	//todo
+	timeout *= 20
+
 	// Reset ack count
 	h.s.ackMu.Lock()
 	h.s.ackCnt = 0
