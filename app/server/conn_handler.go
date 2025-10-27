@@ -2,7 +2,6 @@ package server
 
 import (
 	"bufio"
-	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -184,11 +183,16 @@ func (h *ConnHandler) propagateCMD(cmd CMD) {
 	if !writeCommands[strings.ToUpper(cmd.Command)] {
 		return
 	}
+	h.s.SlaveMu.RLock()
 	for _, slave := range h.s.SlaveConns {
 		strs := append([]string{cmd.Command}, cmd.Args...)
 		slave.Write(resp.EncodeArray(strs))
 	}
+	h.s.SlaveMu.RUnlock()
+
+	h.s.MasterOffsetMu.Lock()
 	h.s.MasterReplOffset += cmd.RespBytes
+	h.s.MasterOffsetMu.Unlock()
 }
 
 func (h *ConnHandler) readCMD() {
@@ -385,6 +389,7 @@ func (h *ConnHandler) handleINFO(cmd CMD) []byte {
 	if len(cmd.Args) > 0 {
 		switch strings.ToLower(cmd.Args[0]) {
 		case "replication":
+			h.s.MasterOffsetMu.RLock()
 			infoStr := fmt.Sprintf(`# Replication
 role:%s
 master_replid:%s
@@ -394,6 +399,7 @@ master_repl_offset:%d
 				h.s.MasterReplId,
 				h.s.MasterReplOffset,
 			)
+			h.s.MasterOffsetMu.RUnlock()
 
 			res = resp.EncodeBulkString(infoStr)
 		}
@@ -402,8 +408,22 @@ master_repl_offset:%d
 }
 
 func (h *ConnHandler) handleREPLCONF(cmd CMD) []byte {
+	// slave
 	if strings.EqualFold(cmd.Args[0], "GETACK") && strings.EqualFold(cmd.Args[1], "*") {
 		return resp.EncodeArray([]string{"REPLCONF", "ACK", fmt.Sprintf("%d", h.s.SlaveReplOffset)})
+	}
+	if strings.EqualFold(cmd.Args[0], "ACK") {
+		offset, _ := strconv.Atoi(cmd.Args[1])
+
+		h.s.MasterOffsetMu.RLock()
+		if offset >= h.s.MasterReplOffset {
+			h.s.MasterOffsetMu.RUnlock()
+
+			h.s.ackMu.Lock()
+			h.s.ackCnt++
+			h.s.ackMu.Unlock()
+		}
+		return []byte{}
 	}
 	return []byte("+OK\r\n")
 }
@@ -419,7 +439,9 @@ func (h *ConnHandler) handlePSYNC() []byte {
 	}
 	res = append(res, resp.EncodeRDBFile(rdbBytes)...)
 
+	h.s.SlaveMu.Lock()
 	h.s.SlaveConns = append(h.s.SlaveConns, h.conn)
+	h.s.SlaveMu.Unlock()
 
 	return res
 }
@@ -439,38 +461,41 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	timeoutMs, err := strconv.Atoi(cmd.Args[1])
 	timeout := time.Microsecond * time.Duration(timeoutMs)
 
-	ackCh := make(chan int, len(h.s.SlaveConns))
+	// Reset ack count
+	h.s.ackMu.Lock()
+	h.s.ackCnt = 0
+	h.s.ackMu.Unlock()
 
-	log.Printf("[debug] before creating tCtx. numReplcas = %d, timeoutMs = %d \n", numReplcas, timeoutMs)
-
-	tCtx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	// Send GETACK to slaves
+	// Send getack to slaves
+	h.s.SlaveMu.RLock()
 	for _, slaveConn := range h.s.SlaveConns {
-		log.Printf("[debug] in for loop, before goroutine \n")
-		go func(conn net.Conn) {
-			conn.Write(resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"}))
-			// Receive response from slave. Should be "REPLCONF ACK <offset>"
-			res, _, _ := resp.DecodeArray(bufio.NewReader(conn))
-			log.Printf("[debug] in goroutine received: %v", res)
-			offset, _ := strconv.Atoi(res[2])
-			ackCh <- offset
-		}(slaveConn)
-	}
+		getAckBytes := resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"})
+		slaveConn.Write(getAckBytes)
 
-	cnt := 0
+		h.s.MasterOffsetMu.Lock()
+		h.s.MasterReplOffset += len(getAckBytes)
+		h.s.MasterOffsetMu.Unlock()
+	}
+	h.s.SlaveMu.RUnlock()
+
+	// Time stopper
+	timeoutCh := time.After(timeout)
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 
 	for {
 		select {
-		case <-tCtx.Done():
-			return resp.EncodeInt(cnt)
-		case slaveOffset := <-ackCh:
-			if slaveOffset >= h.s.MasterReplOffset {
-				cnt++
-			}
-			if cnt >= numReplcas {
-				return resp.EncodeInt(cnt)
+		case <-timeoutCh:
+			h.s.ackMu.RLock()
+			defer h.s.ackMu.RUnlock()
+			return resp.EncodeInt(h.s.ackCnt)
+		case <-ticker.C:
+			h.s.ackMu.RLock()
+			curCnt := h.s.ackCnt
+			h.s.ackMu.RUnlock()
+			if curCnt >= numReplcas {
+				return resp.EncodeInt(curCnt)
 			}
 		}
 	}

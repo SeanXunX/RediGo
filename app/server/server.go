@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
@@ -18,16 +19,22 @@ type Server struct {
 	Port int
 	Role string
 
-	MasterReplId     string
-	MasterReplOffset int
+	MasterReplId string
+
+	MasterOffsetMu   sync.RWMutex
+	MasterReplOffset int // Write by multi clients (propagate) and self (getack). Read by self.
 
 	Replicaof string
 
-	SlaveReplOffset int
+	SlaveReplOffset int // Only written by slave itself.
 
-	KVStore *kv.KVStore
+	KVStore *kv.KVStore // Concurrent safe. No need for mutex.
 
-	SlaveConns []net.Conn
+	SlaveMu    sync.RWMutex
+	SlaveConns []net.Conn // Written by slaves. Read by self.
+
+	ackMu  sync.RWMutex
+	ackCnt int
 }
 
 func NewServer(host string, port int, role string, masterReplId string, masterReplOffset int, replicaof string) *Server {
