@@ -421,7 +421,7 @@ func (h *ConnHandler) handleREPLCONF(cmd CMD) []byte {
 
 		h.s.MasterOffsetMu.RLock()
 		defer h.s.MasterOffsetMu.RUnlock()
-		fmt.Printf("[debug] slaveoffset = %d, masteroffset = %d", offset, h.s.MasterReplOffset)
+		fmt.Printf("[debug] slaveoffset = %d, masteroffset = %d\n", offset, h.s.MasterReplOffset)
 		if offset >= h.s.MasterReplOffset {
 
 			h.s.ackMu.Lock()
@@ -486,9 +486,6 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 
 	timeoutMs, err := strconv.Atoi(cmd.Args[1])
 	timeout := time.Microsecond * time.Duration(timeoutMs)
-
-	//todo
-	timeout *= 5
 
 	// Time stopper
 	timeoutCh := time.After(timeout)
