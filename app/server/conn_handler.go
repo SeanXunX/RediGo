@@ -460,7 +460,7 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 	for {
 		select {
 		case <-tCtx.Done():
-			return nil
+			return resp.EncodeInt(cnt)
 		case slaveOffset := <-ackCh:
 			if slaveOffset >= h.s.MasterReplOffset {
 				cnt++
