@@ -459,13 +459,13 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 
 	// Send getack to slaves
 	getAckBytes := resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"})
-	defer func() {
-		h.s.MasterOffsetMu.Lock()
-		fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v before offset = %d\n", "gettack", h.s.MasterReplOffset)
-		h.s.MasterReplOffset += len(getAckBytes)
-		fmt.Printf("[debug] <<<<<<< increasing masteroffset, cmd = %v after offset = %d\n", "gettack", h.s.MasterReplOffset)
-		h.s.MasterOffsetMu.Unlock()
-	}()
+	// defer func() {
+	// 	h.s.MasterOffsetMu.Lock()
+	// 	fmt.Printf("[debug] >>>>>>> increasing masteroffset, cmd = %v before offset = %d\n", "gettack", h.s.MasterReplOffset)
+	// 	h.s.MasterReplOffset += len(getAckBytes)
+	// 	fmt.Printf("[debug] <<<<<<< increasing masteroffset, cmd = %v after offset = %d\n", "gettack", h.s.MasterReplOffset)
+	// 	h.s.MasterOffsetMu.Unlock()
+	// }()
 
 	h.s.SlaveMu.RLock()
 	for _, slaveConn := range h.s.SlaveConns {
