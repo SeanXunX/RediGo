@@ -174,6 +174,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handlePSYNC()
 	case "WAIT":
 		return h.handleWAIT(cmd)
+	case "CONFIG":
+		return h.handleCONFIG(cmd)
 	default:
 		return []byte{}
 	}
@@ -512,4 +514,16 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 			}
 		}
 	}
+}
+
+func (h *ConnHandler) handleCONFIG(cmd CMD) []byte {
+	if cmd.Args[0] == "GET" {
+		switch param := cmd.Args[1]; param {
+		case "dir":
+			return resp.EncodeBulkString(h.s.Dir)
+		case "dbfilename":
+			return resp.EncodeBulkString(h.s.Dbfilename)
+		}
+	}
+	return []byte{}
 }

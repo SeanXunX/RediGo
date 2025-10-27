@@ -18,6 +18,8 @@ func main() {
 
 	port := flag.Int("port", 6379, "server port")
 	replicaof := flag.String("replicaof", "", "replication of")
+	dir := flag.String("dir", "", "directory where RDB file is stored")
+	dbfilename := flag.String("dbfilename", "", "the name of RDB file")
 
 	flag.Parse()
 
@@ -36,6 +38,8 @@ func main() {
 		master_replid,
 		master_repl_offset,
 		*replicaof,
+		*dir,
+		*dbfilename,
 	)
 
 	s.Run()

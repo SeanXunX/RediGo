@@ -35,9 +35,12 @@ type Server struct {
 
 	ackMu  sync.RWMutex
 	ackCnt int
+
+	Dir        string
+	Dbfilename string
 }
 
-func NewServer(host string, port int, role string, masterReplId string, masterReplOffset int, replicaof string) *Server {
+func NewServer(host string, port int, role string, masterReplId string, masterReplOffset int, replicaof string, dir, dbfilename string) *Server {
 	return &Server{
 		Host:             host,
 		Port:             port,
@@ -47,6 +50,8 @@ func NewServer(host string, port int, role string, masterReplId string, masterRe
 		Replicaof:        replicaof,
 		KVStore:          kv.NewKVStore(),
 		SlaveConns:       []net.Conn{},
+		Dir:              dir,
+		Dbfilename:       dbfilename,
 	}
 }
 
