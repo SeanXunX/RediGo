@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -187,6 +188,7 @@ func (h *ConnHandler) propagateCMD(cmd CMD) {
 		strs := append([]string{cmd.Command}, cmd.Args...)
 		slave.Write(resp.EncodeArray(strs))
 	}
+	h.s.MasterReplOffset += cmd.RespBytes
 }
 
 func (h *ConnHandler) readCMD() {
@@ -434,18 +436,38 @@ func (h *ConnHandler) handleWAIT(cmd CMD) []byte {
 		return []byte{}
 	}
 
-	return resp.EncodeInt(len(h.s.SlaveConns))
+	timeoutMs, err := strconv.Atoi(cmd.Args[1])
+	timeout := time.Microsecond * time.Duration(timeoutMs)
 
-	// timeoutMs, err := strconv.Atoi(cmd.Args[1])
-	// timeout := time.Microsecond * time.Duration(timeoutMs)
-	//
-	// tCtx, cancel := context.WithTimeout(context.Background(), timeout)
-	// defer cancel()
-	//
-	// select {
-	// case <-tCtx.Done():
-	//
-	// }
-	//
-	return []byte{}
+	tCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ackCh := make(chan int, len(h.s.SlaveConns))
+
+	// Send GETACK to slaves
+	for _, slaveConn := range h.s.SlaveConns {
+		go func(conn net.Conn) {
+			conn.Write(resp.EncodeArray([]string{"REPLCONF", "GETACK", "*"}))
+			// Receive response from slave. Should be "REPLCONF ACK <offset>"
+			res, _, _ := resp.DecodeArray(bufio.NewReader(conn))
+			offset, _ := strconv.Atoi(res[2])
+			ackCh <- offset
+		}(slaveConn)
+	}
+
+	cnt := 0
+
+	for {
+		select {
+		case <-tCtx.Done():
+			return nil
+		case slaveOffset := <-ackCh:
+			if slaveOffset >= h.s.MasterReplOffset {
+				cnt++
+			}
+			if cnt >= numReplcas {
+				return resp.EncodeInt(cnt)
+			}
+		}
+	}
 }
