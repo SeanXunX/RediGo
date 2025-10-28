@@ -97,6 +97,15 @@ func (kv *KVStore) ZRange(key string, start, end int) (res []string) {
 	}
 
 	ss := zSet.scores
+	length := len(ss)
+
+	if start < 0 {
+		start = length + start
+	}
+
+	if end < 0 {
+		end = length + end
+	}
 
 	if start >= len(ss) || start > end {
 		return
