@@ -641,13 +641,15 @@ func (h *ConnHandler) handleSUBSCRIBE(cmd CMD) []byte {
 func (h *ConnHandler) handlePUBLISH(cmd CMD) []byte {
 	chName, msg := cmd.Args[0], cmd.Args[1]
 
+	encodedMsg := resp.EncodeArray([]string{"message", chName, msg})
+
 	// Get all the clients conn
 	psMan := h.s.PubSub
 
 	psMan.mu.RLock()
 	cnt := len(psMan.channels[chName])
 	for conn := range psMan.channels[chName] {
-		conn.Write([]byte(msg))
+		conn.Write(encodedMsg)
 	}
 	psMan.mu.RUnlock()
 
