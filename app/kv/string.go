@@ -8,7 +8,7 @@ import (
 
 type StringValue struct {
 	value     string
-	px        int
+	px        int // Millisecond
 	createdAt time.Time
 }
 

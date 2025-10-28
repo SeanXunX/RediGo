@@ -36,7 +36,8 @@ func (s *Server) Parse(filePath string) error {
 
 		switch opcode {
 		case 0xFD: // expire in seconds
-			if _, err := readUint32(f); err != nil {
+			seconds, err := readUint32(f)
+			if err != nil {
 				return err
 			}
 			valueType, _ := readByte(f)
@@ -44,13 +45,14 @@ func (s *Server) Parse(filePath string) error {
 			if err != nil {
 				return err
 			}
-			sVal, err := readValue(f, valueType)
+			sVal, err := readValue(f, valueType, 1000*int(seconds))
 			if err != nil {
 				return err
 			}
 			s.KVStore.Store(key, sVal)
 		case 0xFC: // expire in milliseconds
-			if _, err := readUint64(f); err != nil {
+			milliSeconds, err := readUint64(f)
+			if err != nil {
 				return err
 			}
 			valueType, _ := readByte(f)
@@ -58,7 +60,7 @@ func (s *Server) Parse(filePath string) error {
 			if err != nil {
 				return err
 			}
-			sVal, err := readValue(f, valueType)
+			sVal, err := readValue(f, valueType, int(milliSeconds))
 			if err != nil {
 				return err
 			}
@@ -97,7 +99,7 @@ func (s *Server) Parse(filePath string) error {
 			if err != nil {
 				return err
 			}
-			sVal, err := readValue(f, valueType)
+			sVal, err := readValue(f, valueType, -1)
 			if err != nil {
 				return err
 			}
@@ -224,14 +226,14 @@ func readString(r io.Reader) (string, error) {
 	return string(buf), nil
 }
 
-func readValue(r io.Reader, valueType byte) (kv.StoreValue, error) {
+func readValue(r io.Reader, valueType byte, px int) (kv.StoreValue, error) {
 	switch valueType {
 	case 0: // string - use readString to handle special encodings
 		val, err := readString(r)
 		if err != nil {
 			return kv.StoreValue{}, err
 		} else {
-			strVal := kv.NewStringValue(val, -1)
+			strVal := kv.NewStringValue(val, px)
 			return kv.NewStoreValue(kv.StringType, strVal), nil
 		}
 	default:
