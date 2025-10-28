@@ -131,9 +131,47 @@ func isSubModCommand(cmd CMD) bool {
 	return subModeCommands[strings.ToUpper(cmd.Command)]
 }
 
-func (h *ConnHandler) run(cmd CMD) []byte {
+func (h *ConnHandler) propagateCMD(cmd CMD) {
+	if !writeCommands[strings.ToUpper(cmd.Command)] {
+		return
+	}
+	h.s.SlaveMu.RLock()
+	for _, slave := range h.s.SlaveConns {
+		strs := append([]string{cmd.Command}, cmd.Args...)
+		slave.Write(resp.EncodeArray(strs))
+	}
+	h.s.SlaveMu.RUnlock()
 
-	if h.isInSubMode() && !isSubModCommand(cmd) {
+	h.s.MasterOffsetMu.Lock()
+	h.s.MasterReplOffset += cmd.RespBytes
+	h.s.MasterOffsetMu.Unlock()
+}
+
+func (h *ConnHandler) readCMD() {
+	reader := bufio.NewReader(h.conn)
+	for {
+		parts, n, err := resp.DecodeArray(reader)
+		if err == io.EOF {
+			log.Println("Received EOF")
+			return
+		} else if err != nil {
+			log.Println(err.Error())
+			continue
+		}
+		cmd := CMD{RespBytes: n}
+		if len(parts) > 0 {
+			cmd.Command = parts[0]
+			if len(parts) > 1 {
+				cmd.Args = parts[1:]
+			}
+			h.in <- cmd
+		}
+	}
+}
+
+func (h *ConnHandler) run(cmd CMD) []byte {
+	isSubMode := h.isInSubMode()
+	if isSubMode && !isSubModCommand(cmd) {
 		return resp.EncodeSimpleError(
 			fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd.Command),
 		)
@@ -148,7 +186,7 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 	case "COMMAND":
 		return []byte("*0\r\n")
 	case "PING":
-		return []byte("+PONG\r\n")
+		return h.handlePING(isSubMode)
 	case "ECHO":
 		return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(cmd.Args[0]), cmd.Args[0]))
 	case "SET":
@@ -230,41 +268,11 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 	}
 }
 
-func (h *ConnHandler) propagateCMD(cmd CMD) {
-	if !writeCommands[strings.ToUpper(cmd.Command)] {
-		return
-	}
-	h.s.SlaveMu.RLock()
-	for _, slave := range h.s.SlaveConns {
-		strs := append([]string{cmd.Command}, cmd.Args...)
-		slave.Write(resp.EncodeArray(strs))
-	}
-	h.s.SlaveMu.RUnlock()
-
-	h.s.MasterOffsetMu.Lock()
-	h.s.MasterReplOffset += cmd.RespBytes
-	h.s.MasterOffsetMu.Unlock()
-}
-
-func (h *ConnHandler) readCMD() {
-	reader := bufio.NewReader(h.conn)
-	for {
-		parts, n, err := resp.DecodeArray(reader)
-		if err == io.EOF {
-			log.Println("Received EOF")
-			return
-		} else if err != nil {
-			log.Println(err.Error())
-			continue
-		}
-		cmd := CMD{RespBytes: n}
-		if len(parts) > 0 {
-			cmd.Command = parts[0]
-			if len(parts) > 1 {
-				cmd.Args = parts[1:]
-			}
-			h.in <- cmd
-		}
+func (h *ConnHandler) handlePING(isSubMod bool) []byte {
+	if !isSubMod {
+		return []byte("+PONG\r\n")
+	} else {
+		return resp.EncodeArray([]string{"pong", ""})
 	}
 }
 
