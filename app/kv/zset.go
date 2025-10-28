@@ -120,3 +120,14 @@ func (kv *KVStore) ZRange(key string, start, end int) (res []string) {
 	}
 	return
 }
+
+func (kv *KVStore) ZCard(key string) int {
+	storeValAny, ok := kv.mp.Load(key)
+	var zSet ZSetValue
+	if !ok {
+		return 0
+	} else {
+		zSet = storeValAny.(StoreValue).v.(ZSetValue)
+	}
+	return len(zSet.scores)
+}

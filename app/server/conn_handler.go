@@ -273,6 +273,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleZRANK(cmd)
 	case "ZRANGE":
 		return h.handleZRANGE(cmd)
+	case "ZCARD":
+		return h.handleZCARD(cmd)
 	default:
 		return []byte{}
 	}
@@ -741,4 +743,10 @@ func (h *ConnHandler) handleZRANGE(cmd CMD) []byte {
 
 	members := h.s.KVStore.ZRange(key, start, end)
 	return resp.EncodeArray(members)
+}
+
+func (h *ConnHandler) handleZCARD(cmd CMD) []byte {
+	key := cmd.Args[0]
+	length := h.s.KVStore.ZCard(key)
+	return resp.EncodeInt(length)
 }
