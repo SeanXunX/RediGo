@@ -199,7 +199,7 @@ func (s *Server) SendHandShake() {
 	}
 	// 完成后再启动 handler 处理后续命令
 	h := NewConnHandler(conn, s)
-	go h.Handle(true)
+	h.Handle(true)
 }
 
 //	func (s *Server) ReceiveRDB(reader *bufio.Reader) {
