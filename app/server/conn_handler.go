@@ -269,6 +269,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleUNSUBSCRIBE(cmd)
 	case "ZADD":
 		return h.handleZADD(cmd)
+	case "ZRANK":
+		return h.handleZRANK(cmd)
 	default:
 		return []byte{}
 	}
@@ -705,5 +707,17 @@ func (h *ConnHandler) handleZADD(cmd CMD) []byte {
 		return resp.EncodeInt(1)
 	} else {
 		return resp.EncodeInt(0)
+	}
+}
+
+func (h *ConnHandler) handleZRANK(cmd CMD) []byte {
+	key := cmd.Args[0]
+	member := cmd.Args[1]
+
+	rnk := h.s.KVStore.ZRank(key, member)
+	if rnk == nil {
+		return resp.EncodeNullBulkString()
+	} else {
+		return resp.EncodeInt(rnk.(int))
 	}
 }

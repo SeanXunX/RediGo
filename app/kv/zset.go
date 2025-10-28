@@ -1,22 +1,32 @@
 package kv
 
-import "sort"
+import (
+	"sort"
+)
+
+type ZSetElem struct {
+	member string
+	score  float64
+}
 
 type ZSetValue struct {
 	memToScore map[string]float64
-	scores     []float64
+	scores     []ZSetElem
 }
 
 func NewEmptyZSetValue() ZSetValue {
 	return ZSetValue{
 		memToScore: make(map[string]float64),
-		scores:     []float64{},
+		scores:     []ZSetElem{},
 	}
 }
 
-func LowerBound(s []float64, tar float64) int {
+func LowerBound(s []ZSetElem, tar ZSetElem) int {
 	return sort.Search(len(s), func(i int) bool {
-		return s[i] >= tar
+		if s[i].score == tar.score {
+			return s[i].member >= tar.member
+		}
+		return s[i].score > tar.score
 	})
 }
 
@@ -33,22 +43,44 @@ func (kv *KVStore) ZAdd(key string, member string, score float64) (isNew bool) {
 	if oldScore, ok := newZSet.memToScore[member]; ok {
 		isNew = false
 		delete(newZSet.memToScore, member)
-		pos := LowerBound(newZSet.scores, oldScore)
+		pos := LowerBound(newZSet.scores, ZSetElem{member, oldScore})
 		newZSet.scores = append(newZSet.scores[:pos], newZSet.scores[pos+1:]...)
 	} else {
 		isNew = true
 	}
 
 	// Insert member into the zset
-	insertIdx := LowerBound(newZSet.scores, score)
+	newElem := ZSetElem{member, score}
+	insertIdx := LowerBound(newZSet.scores, newElem)
 
-	newZSet.scores = append(newZSet.scores, 0)
+	newZSet.scores = append(newZSet.scores, ZSetElem{})
 	copy(newZSet.scores[insertIdx+1:], newZSet.scores[insertIdx:])
-	newZSet.scores[insertIdx] = score
+	newZSet.scores[insertIdx] = newElem
 
 	newZSet.memToScore[member] = score
 
 	kv.store(key, newZSet, ZSetType)
 
 	return
+}
+
+func (kv *KVStore) ZRank(key string, member string) any {
+	storeValAny, ok := kv.mp.Load(key)
+	var zSet ZSetValue
+	if !ok {
+		return nil
+	} else {
+		zSet = storeValAny.(StoreValue).v.(ZSetValue)
+	}
+
+	var score float64
+	if s, ok := zSet.memToScore[member]; !ok {
+		return nil
+	} else {
+		score = s
+	}
+
+	pos := LowerBound(zSet.scores, ZSetElem{member, score})
+
+	return pos
 }
