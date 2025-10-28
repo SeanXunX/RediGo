@@ -12,6 +12,14 @@ type StringValue struct {
 	createdAt time.Time
 }
 
+func NewStringValue(value string, px int) StringValue {
+	return StringValue{
+		value:     value,
+		px:        px,
+		createdAt: time.Now(),
+	}
+}
+
 func (kv *KVStore) Set(key, value string) {
 	v := StringValue{
 		value:     value,

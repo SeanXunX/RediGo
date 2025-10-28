@@ -231,7 +231,8 @@ func readValue(r io.Reader, valueType byte) (kv.StoreValue, error) {
 		if err != nil {
 			return kv.StoreValue{}, err
 		} else {
-			return kv.NewStoreValue(kv.StringType, val), nil
+			strVal := kv.NewStringValue(val, -1)
+			return kv.NewStoreValue(kv.StringType, strVal), nil
 		}
 	default:
 		return kv.StoreValue{}, nil
