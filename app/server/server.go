@@ -182,7 +182,7 @@ func (s *Server) ReceiveRDB(reader *bufio.Reader) {
 	}
 	if string(header) != "REDIS" {
 		log.Println("Invalid RDB header:", string(header))
-		return
+		// return
 	}
 
 	// 剩余部分直接读到文件或内存
