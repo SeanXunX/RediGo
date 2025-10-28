@@ -14,7 +14,7 @@ func DecodeArray(reader *bufio.Reader) ([]string, int, error) {
 	numberLine, err := reader.ReadString('\n')
 	if err != nil {
 		log.Printf("Error reading numberLine: %s\n", err.Error())
-		return nil, totalBytes, err
+		// return nil, totalBytes, err
 	}
 	totalBytes += len(numberLine)
 
