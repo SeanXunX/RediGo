@@ -265,6 +265,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleSUBSCRIBE(cmd)
 	case "PUBLISH":
 		return h.handlePUBLISH(cmd)
+	case "UNSUBSCRIBE":
+		return h.handleUNSUBSCRIBE(cmd)
 	default:
 		return []byte{}
 	}
@@ -600,15 +602,21 @@ func (h *ConnHandler) handleSUBSCRIBE(cmd CMD) []byte {
 	psMan := h.s.PubSub
 
 	psMan.mu.RLock()
-	_, ok := psMan.subscribers[h.conn]
+	_, ok := psMan.channels[chName]
+	psMan.mu.RUnlock()
+	if !ok {
+		psMan.mu.Lock()
+		psMan.channels[chName] = make(map[net.Conn]*Subscriber)
+		psMan.mu.Unlock()
+	}
+
+	psMan.mu.RLock()
+	_, ok = psMan.subscribers[h.conn]
 	psMan.mu.RUnlock()
 
 	if !ok {
 		psMan.mu.Lock()
 		psMan.subscribers[h.conn] = NewSubscriber()
-		if _, ok := psMan.channels[chName]; !ok {
-			psMan.channels[chName] = make(map[net.Conn]*Subscriber)
-		}
 		psMan.channels[chName][h.conn] = psMan.subscribers[h.conn]
 		psMan.mu.Unlock()
 	}
@@ -654,4 +662,42 @@ func (h *ConnHandler) handlePUBLISH(cmd CMD) []byte {
 	psMan.mu.RUnlock()
 
 	return resp.EncodeInt(cnt)
+}
+
+func (h *ConnHandler) handleUNSUBSCRIBE(cmd CMD) []byte {
+	chName := cmd.Args[0]
+
+	psMan := h.s.PubSub
+
+	psMan.mu.RLock()
+	_, ok := psMan.channels[chName]
+	psMan.mu.RUnlock()
+	if !ok {
+		psMan.mu.Lock()
+		psMan.channels[chName] = make(map[net.Conn]*Subscriber)
+		psMan.mu.Unlock()
+	}
+
+	psMan.mu.Lock()
+	delete(psMan.channels[chName], h.conn)
+	psMan.mu.Unlock()
+
+	psMan.mu.RLock()
+	sub := psMan.subscribers[h.conn]
+	psMan.mu.RUnlock()
+
+	sub.mu.Lock()
+	delete(sub.Channels, chName)
+	sub.mu.Unlock()
+
+	sub.mu.RLock()
+	cnt := len(sub.Channels)
+	sub.mu.RUnlock()
+
+	res := fmt.Appendf([]byte{}, "*%d\r\n", 3)
+	res = append(res, resp.EncodeBulkString("unsubscribe")...)
+	res = append(res, resp.EncodeBulkString(chName)...)
+	res = append(res, resp.EncodeInt(cnt)...)
+	return res
+
 }
