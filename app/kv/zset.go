@@ -64,6 +64,8 @@ func (kv *KVStore) ZAdd(key string, member string, score float64) (isNew bool) {
 	return
 }
 
+// If the member, or the sorted set does not exist, return nil.
+// Otherwise, return the rank.
 func (kv *KVStore) ZRank(key string, member string) any {
 	storeValAny, ok := kv.mp.Load(key)
 	var zSet ZSetValue

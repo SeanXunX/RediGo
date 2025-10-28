@@ -8,6 +8,8 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -156,38 +158,121 @@ func (s *Server) SendHandShake() {
 	line, _ = reader.ReadString('\n')
 	log.Println("REPLCONF capa response:", line)
 
+	// // PSYNC
+	// conn.Write(resp.EncodeArray([]string{"PSYNC", "?", "-1"}))
+	// line, _ = reader.ReadString('\n')
+	// log.Println("PSYNC response:", line)
+	//
+	// // 如果是 FULLRESYNC，则接下来是 RDB 文件
+	// if strings.HasPrefix(line, "+FULLRESYNC") {
+	// 	// 开始接收 RDB 二进制数据
+	// 	s.ReceiveRDB(reader)
+	// }
+
 	// PSYNC
 	conn.Write(resp.EncodeArray([]string{"PSYNC", "?", "-1"}))
-	line, _ = reader.ReadString('\n')
-	log.Println("PSYNC response:", line)
-
-	// 如果是 FULLRESYNC，则接下来是 RDB 文件
-	if strings.HasPrefix(line, "+FULLRESYNC") {
-		// 开始接收 RDB 二进制数据
-		s.ReceiveRDB(reader)
+	line, err = reader.ReadString('\n')
+	if err != nil {
+		log.Println("Error reading PSYNC response:", err)
+		return
 	}
 
+	line = strings.TrimSpace(line)
+	log.Println("PSYNC response:", line)
+
+	// 解析 FULLRESYNC 响应
+	if strings.HasPrefix(line, "+FULLRESYNC") {
+		parts := strings.Fields(line)
+		if len(parts) >= 3 {
+			s.MasterReplId = parts[1]
+			offset, _ := strconv.Atoi(parts[2])
+			s.SlaveReplOffset = offset
+			log.Printf("Master repl ID: %s, offset: %d\n", s.MasterReplId, offset)
+		}
+
+		// 接收 RDB 文件
+		err = s.ReceiveRDB(reader)
+		if err != nil {
+			log.Println("Failed to receive RDB:", err)
+			return
+		}
+	}
 	// 完成后再启动 handler 处理后续命令
 	h := NewConnHandler(conn, s)
 	go h.Handle(true)
 }
 
-func (s *Server) ReceiveRDB(reader *bufio.Reader) {
-	// RDB 文件头是 "REDIS"
-	header := make([]byte, 5)
-	_, err := io.ReadFull(reader, header)
+//	func (s *Server) ReceiveRDB(reader *bufio.Reader) {
+//		// RDB 文件头是 "REDIS"
+//		header := make([]byte, 5)
+//		_, err := io.ReadFull(reader, header)
+//		if err != nil {
+//			log.Println("Error reading RDB header:", err)
+//			return
+//		}
+//		if string(header) != "REDIS" {
+//			log.Println("Invalid RDB header:", string(header))
+//			return
+//		}
+//
+//		// 剩余部分直接读到文件或内存
+//		f, _ := os.Create("dump.rdb")
+//		defer f.Close()
+//		io.Copy(f, reader)
+//		log.Println("RDB file received.")
+//	}
+func (s *Server) ReceiveRDB(reader *bufio.Reader) error {
+	// 1. 读取 bulk string 的长度标识 "$<length>\r\n"
+	line, err := reader.ReadString('\n')
 	if err != nil {
-		log.Println("Error reading RDB header:", err)
-		return
-	}
-	if string(header) != "REDIS" {
-		log.Println("Invalid RDB header:", string(header))
-		// return
+		log.Println("Error reading RDB length prefix:", err)
+		return err
 	}
 
-	// 剩余部分直接读到文件或内存
-	f, _ := os.Create("dump.rdb")
-	defer f.Close()
-	io.Copy(f, reader)
-	log.Println("RDB file received.")
+	line = strings.TrimSpace(line)
+	if !strings.HasPrefix(line, "$") {
+		log.Printf("Invalid RDB format, expected $, got: %s\n", line)
+		return fmt.Errorf("invalid RDB format: %s", line)
+	}
+
+	// 2. 解析 RDB 文件长度
+	lengthStr := line[1:] // 去掉 "$"
+	length, err := strconv.Atoi(lengthStr)
+	if err != nil {
+		log.Println("Error parsing RDB length:", err)
+		return err
+	}
+
+	log.Printf("Receiving RDB file of %d bytes\n", length)
+
+	// 3. 读取指定长度的 RDB 数据
+	rdbData := make([]byte, length)
+	_, err = io.ReadFull(reader, rdbData)
+	if err != nil {
+		log.Println("Error reading RDB data:", err)
+		return err
+	}
+
+	// 4. 验证 RDB 头（前5个字节应该是 "REDIS"）
+	if len(rdbData) < 5 || string(rdbData[0:5]) != "REDIS" {
+		log.Printf("Invalid RDB header: %s\n", string(rdbData[0:min(5, len(rdbData))]))
+		return fmt.Errorf("invalid RDB header")
+	}
+
+	// 5. 可选：保存到文件
+	if s.Dir != "" && s.Dbfilename != "" {
+		filepath := filepath.Join(s.Dir, s.Dbfilename)
+		err = os.WriteFile(filepath, rdbData, 0644)
+		if err != nil {
+			log.Println("Error writing RDB file:", err)
+		} else {
+			log.Println("RDB file saved to:", filepath)
+		}
+	}
+
+	// 6. 可选：解析 RDB 加载数据到 KVStore
+	// s.LoadRDB(rdbData)
+
+	log.Println("RDB file received successfully")
+	return nil
 }
