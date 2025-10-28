@@ -267,6 +267,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handlePUBLISH(cmd)
 	case "UNSUBSCRIBE":
 		return h.handleUNSUBSCRIBE(cmd)
+	case "ZADD":
+		return h.handleZADD(cmd)
 	default:
 		return []byte{}
 	}
@@ -688,4 +690,20 @@ func (h *ConnHandler) handleUNSUBSCRIBE(cmd CMD) []byte {
 	res = append(res, resp.EncodeInt(cnt)...)
 	return res
 
+}
+
+func (h *ConnHandler) handleZADD(cmd CMD) []byte {
+	key := cmd.Args[0]
+	score, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		log.Println(err.Error())
+		return []byte{}
+	}
+	member := cmd.Args[2]
+	isNew := h.s.KVStore.ZAdd(key, member, score)
+	if isNew {
+		return resp.EncodeInt(1)
+	} else {
+		return resp.EncodeInt(0)
+	}
 }
