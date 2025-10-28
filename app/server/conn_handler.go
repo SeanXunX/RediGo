@@ -604,6 +604,7 @@ func (h *ConnHandler) handleSUBSCRIBE(cmd CMD) []byte {
 	if !ok {
 		psMan.mu.Lock()
 		psMan.subscribers[h.conn] = NewSubscriber()
+		psMan.channels[chName][h.conn] = psMan.subscribers[h.conn]
 		psMan.mu.Unlock()
 	}
 
@@ -630,4 +631,20 @@ func (h *ConnHandler) handleSUBSCRIBE(cmd CMD) []byte {
 	res = append(res, resp.EncodeBulkString(chName)...)
 	res = append(res, resp.EncodeInt(cnt)...)
 	return res
+}
+
+func (h *ConnHandler) handlePUBLISH(cmd CMD) []byte {
+	chName, msg := cmd.Args[0], cmd.Args[1]
+
+	// Get all the clients conn
+	psMan := h.s.PubSub
+
+	psMan.mu.RLock()
+	cnt := len(psMan.channels[chName])
+	for conn := range psMan.channels[chName] {
+		conn.Write([]byte(msg))
+	}
+	psMan.mu.RUnlock()
+
+	return resp.EncodeInt(cnt)
 }

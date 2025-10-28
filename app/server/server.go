@@ -47,8 +47,8 @@ type Server struct {
 type PubSubManager struct {
 	mu sync.RWMutex
 
-	// // channel -> subscriber connections
-	// channels map[string]map[net.Conn]*Subscriber
+	// channel -> subscriber connections
+	channels map[string]map[net.Conn]*Subscriber
 
 	// // pattern -> subscriber connections
 	// patterns map[string]map[net.Conn]*Subscriber
@@ -66,7 +66,7 @@ type Subscriber struct {
 
 func NewPubSubManager() *PubSubManager {
 	return &PubSubManager{
-		// channels: make(map[string]map[net.Conn]*Subscriber),
+		channels: make(map[string]map[net.Conn]*Subscriber),
 		// patterns:    make(map[string]map[net.Conn]*Subscriber),
 		subscribers: make(map[net.Conn]*Subscriber),
 	}
