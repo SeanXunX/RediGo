@@ -166,10 +166,10 @@ func (h *ConnHandler) readCMD() {
 	for {
 		parts, n, err := resp.DecodeArray(reader)
 		if err == io.EOF {
-			log.Println("Received EOF")
+			// log.Println("Received EOF")
 			return
 		} else if err != nil {
-			log.Println(err.Error())
+			// log.Println(err.Error())
 			continue
 		}
 		cmd := CMD{RespBytes: n}

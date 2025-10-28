@@ -13,13 +13,13 @@ func DecodeArray(reader *bufio.Reader) ([]string, int, error) {
 
 	numberLine, err := reader.ReadString('\n')
 	if err != nil {
-		log.Printf("Error reading numberLine: %s\n", err.Error())
+		// log.Printf("Error reading numberLine: %s\n", err.Error())
 		return nil, totalBytes, fmt.Errorf("invalid first line")
 	}
 	totalBytes += len(numberLine)
 
 	if !strings.HasPrefix(numberLine, "*") {
-		log.Printf("Missing * as the first byte. Received: %s\n", numberLine)
+		// log.Printf("Missing * as the first byte. Received: %s\n", numberLine)
 		return nil, totalBytes, fmt.Errorf("invalid array prefix")
 	}
 
