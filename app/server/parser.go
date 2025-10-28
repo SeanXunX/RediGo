@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
 )
@@ -43,7 +44,7 @@ func (s *Server) Parse(filePath string) error {
 			if err != nil {
 				return err
 			}
-			sVal, err := readValue(f, valueType, 1000*int(seconds))
+			sVal, err := readValue(f, valueType, time.Unix(int64(seconds), 0))
 			if err != nil {
 				return err
 			}
@@ -58,7 +59,7 @@ func (s *Server) Parse(filePath string) error {
 			if err != nil {
 				return err
 			}
-			sVal, err := readValue(f, valueType, int(milliSeconds))
+			sVal, err := readValue(f, valueType, time.UnixMilli(int64(milliSeconds)))
 			if err != nil {
 				return err
 			}
@@ -97,7 +98,7 @@ func (s *Server) Parse(filePath string) error {
 			if err != nil {
 				return err
 			}
-			sVal, err := readValue(f, valueType, -1)
+			sVal, err := readValue(f, valueType, time.Time{})
 			if err != nil {
 				return err
 			}
@@ -224,13 +225,19 @@ func readString(r io.Reader) (string, error) {
 	return string(buf), nil
 }
 
-func readValue(r io.Reader, valueType byte, px int) (kv.StoreValue, error) {
+func readValue(r io.Reader, valueType byte, expireAt time.Time) (kv.StoreValue, error) {
 	switch valueType {
 	case 0: // string - use readString to handle special encodings
 		val, err := readString(r)
 		if err != nil {
 			return kv.StoreValue{}, err
 		} else {
+			var px int
+			if expireAt.IsZero() {
+				px = -1
+			} else {
+				px = int(expireAt.Sub(time.Now()).Milliseconds())
+			}
 			fmt.Printf("[debug] expire time (ms) = %d\n", px)
 			strVal := kv.NewStringValue(val, px)
 			return kv.NewStoreValue(kv.StringType, strVal), nil
