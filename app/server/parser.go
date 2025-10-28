@@ -32,8 +32,6 @@ func (s *Server) Parse(filePath string) error {
 			return err
 		}
 
-		log.Printf("opcode is %X \n", opcode)
-
 		switch opcode {
 		case 0xFD: // expire in seconds
 			seconds, err := readUint32(f)
@@ -233,6 +231,7 @@ func readValue(r io.Reader, valueType byte, px int) (kv.StoreValue, error) {
 		if err != nil {
 			return kv.StoreValue{}, err
 		} else {
+			fmt.Printf("[debug] expire time (ms) = %d\n", px)
 			strVal := kv.NewStringValue(val, px)
 			return kv.NewStoreValue(kv.StringType, strVal), nil
 		}
