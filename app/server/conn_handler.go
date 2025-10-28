@@ -50,6 +50,15 @@ var writeCommands = map[string]bool{
 	"FLUSHALL": true,
 }
 
+var subModeCommands = map[string]bool{
+	"SUBSCRIBE":    true,
+	"UNSUBSCRIBE":  true,
+	"PSUBSCRIBE":   true,
+	"PUNSUBSCRIBE": true,
+	"PING":         true,
+	"QUIT":         true,
+}
+
 func NewConnHandler(conn net.Conn, s *Server) *ConnHandler {
 	return &ConnHandler{
 		conn:          conn,
@@ -92,7 +101,43 @@ func (h *ConnHandler) Handle(isSlave bool) {
 	}
 }
 
+func (h *ConnHandler) isInSubMode() bool {
+	psMan := h.s.PubSub
+
+	psMan.mu.RLock()
+	_, ok := psMan.subscribers[h.conn]
+	psMan.mu.RUnlock()
+
+	if !ok {
+		return false
+	}
+
+	psMan.mu.RLock()
+	sub := psMan.subscribers[h.conn]
+	psMan.mu.RUnlock()
+
+	sub.mu.RLock()
+	cnt := len(sub.Channels)
+	sub.mu.RUnlock()
+
+	if cnt > 0 {
+		return true
+	}
+
+	return false
+}
+
+func isSubModCommand(cmd CMD) bool {
+	return subModeCommands[strings.ToUpper(cmd.Command)]
+}
+
 func (h *ConnHandler) run(cmd CMD) []byte {
+
+	if h.isInSubMode() && !isSubModCommand(cmd) {
+		return resp.EncodeSimpleError(
+			fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd.Command),
+		)
+	}
 
 	if h.inTransaction && !resp.CmpStrNoCase(cmd.Command, "EXEC") && !resp.CmpStrNoCase(cmd.Command, "DISCARD") {
 		h.commandQueue = append(h.commandQueue, cmd)
