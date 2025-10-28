@@ -86,3 +86,26 @@ func (kv *KVStore) ZRank(key string, member string) any {
 
 	return pos
 }
+
+func (kv *KVStore) ZRange(key string, start, end int) (res []string) {
+	storeValAny, ok := kv.mp.Load(key)
+	var zSet ZSetValue
+	if !ok {
+		return
+	} else {
+		zSet = storeValAny.(StoreValue).v.(ZSetValue)
+	}
+
+	ss := zSet.scores
+
+	if start >= len(ss) || start > end {
+		return
+	}
+	end = min(end, len(ss)-1)
+
+	res = make([]string, end-start+1)
+	for i := start; i <= end; i++ {
+		res[i-start] = ss[i].member
+	}
+	return
+}
