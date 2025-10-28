@@ -602,21 +602,15 @@ func (h *ConnHandler) handleSUBSCRIBE(cmd CMD) []byte {
 	psMan := h.s.PubSub
 
 	psMan.mu.RLock()
-	_, ok := psMan.channels[chName]
-	psMan.mu.RUnlock()
-	if !ok {
-		psMan.mu.Lock()
-		psMan.channels[chName] = make(map[net.Conn]*Subscriber)
-		psMan.mu.Unlock()
-	}
-
-	psMan.mu.RLock()
-	_, ok = psMan.subscribers[h.conn]
+	_, ok := psMan.subscribers[h.conn]
 	psMan.mu.RUnlock()
 
 	if !ok {
 		psMan.mu.Lock()
 		psMan.subscribers[h.conn] = NewSubscriber()
+		if _, ok := psMan.channels[chName]; !ok {
+			psMan.channels[chName] = make(map[net.Conn]*Subscriber)
+		}
 		psMan.channels[chName][h.conn] = psMan.subscribers[h.conn]
 		psMan.mu.Unlock()
 	}
@@ -668,15 +662,6 @@ func (h *ConnHandler) handleUNSUBSCRIBE(cmd CMD) []byte {
 	chName := cmd.Args[0]
 
 	psMan := h.s.PubSub
-
-	psMan.mu.RLock()
-	_, ok := psMan.channels[chName]
-	psMan.mu.RUnlock()
-	if !ok {
-		psMan.mu.Lock()
-		psMan.channels[chName] = make(map[net.Conn]*Subscriber)
-		psMan.mu.Unlock()
-	}
 
 	psMan.mu.Lock()
 	delete(psMan.channels[chName], h.conn)
