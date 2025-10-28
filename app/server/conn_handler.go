@@ -7,13 +7,11 @@ import (
 	"io"
 	"log"
 	"net"
-	"path"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
-	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
@@ -535,12 +533,6 @@ func (h *ConnHandler) handleCONFIG(cmd CMD) []byte {
 
 func (h *ConnHandler) handleKEYS(cmd CMD) []byte {
 	query := cmd.Args[0]
-	filePath := path.Join(h.s.Dir, h.s.Dbfilename)
-	switch query {
-	case "*":
-		keys, _ := rdb.ParseKeys(filePath)
-		return resp.EncodeArray(keys)
-	default:
-		return []byte{}
-	}
+	keys := h.s.KVStore.Keys(query)
+	return resp.EncodeArray(keys)
 }

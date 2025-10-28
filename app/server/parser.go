@@ -1,4 +1,4 @@
-package rdb
+package server
 
 import (
 	"encoding/binary"
@@ -6,22 +6,22 @@ import (
 	"io"
 	"log"
 	"os"
+
+	"github.com/codecrafters-io/redis-starter-go/app/kv"
 )
 
-func ParseKeys(filePath string) ([]string, error) {
+func (s *Server) Parse(filePath string) error {
 	f, err := os.Open(filePath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer f.Close()
 
 	header := make([]byte, 9)
 	if _, err := io.ReadFull(f, header); err != nil {
-		return nil, err
+		return err
 	}
 	log.Printf("RDB Version: %s\n", string(header[5:]))
-
-	keys := []string{}
 
 	for {
 		opcode, err := readByte(f)
@@ -29,7 +29,7 @@ func ParseKeys(filePath string) ([]string, error) {
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return err
 		}
 
 		log.Printf("opcode is %X \n", opcode)
@@ -37,46 +37,51 @@ func ParseKeys(filePath string) ([]string, error) {
 		switch opcode {
 		case 0xFD: // expire in seconds
 			if _, err := readUint32(f); err != nil {
-				return keys, err
+				return err
 			}
 			valueType, _ := readByte(f)
 			key, err := readString(f)
 			if err != nil {
-				return keys, err
+				return err
 			}
-			readValue(f, valueType)
-			keys = append(keys, key)
+			sVal, err := readValue(f, valueType)
+			if err != nil {
+				return err
+			}
+			s.KVStore.Store(key, sVal)
 		case 0xFC: // expire in milliseconds
 			if _, err := readUint64(f); err != nil {
-				return keys, err
+				return err
 			}
 			valueType, _ := readByte(f)
 			key, err := readString(f)
 			if err != nil {
-				return keys, err
+				return err
 			}
-			readValue(f, valueType)
-			keys = append(keys, key)
+			sVal, err := readValue(f, valueType)
+			if err != nil {
+				return err
+			}
+			s.KVStore.Store(key, sVal)
 		case 0xFE: // SELECTDB - read db number and continue to next database
 			dbNum, err := readByte(f)
 			if err != nil {
-				return keys, err
+				return err
 			}
 			log.Printf("Switched to database: %d\n", dbNum)
-			// Continue reading keys from this database
 		case 0xFA: // AUX fields
 			if _, err := readString(f); err != nil {
-				return keys, err
+				return err
 			}
 			if _, err := readString(f); err != nil {
-				return keys, err
+				return err
 			}
 		case 0xFB:
 			if _, _, err := readLength(f); err != nil {
-				return keys, err
+				return err
 			}
 			if _, _, err := readLength(f); err != nil {
-				return keys, err
+				return err
 			}
 
 		case 0xFF: // End of RDB file
@@ -84,20 +89,23 @@ func ParseKeys(filePath string) ([]string, error) {
 			var checksum [8]byte
 			io.ReadFull(f, checksum[:])
 			log.Println("End of RDB file")
-			return keys, nil
+			return nil
 		default:
 			// Regular key-value without expiry
 			valueType := opcode
 			key, err := readString(f)
 			if err != nil {
-				return keys, err
+				return err
 			}
-			readValue(f, valueType)
-			keys = append(keys, key)
+			sVal, err := readValue(f, valueType)
+			if err != nil {
+				return err
+			}
+			s.KVStore.Store(key, sVal)
 		}
 	}
 
-	return keys, nil
+	return nil
 }
 
 func readByte(r io.Reader) (byte, error) {
@@ -216,17 +224,16 @@ func readString(r io.Reader) (string, error) {
 	return string(buf), nil
 }
 
-func readValue(r io.Reader, valueType byte) (string, error) {
+func readValue(r io.Reader, valueType byte) (kv.StoreValue, error) {
 	switch valueType {
 	case 0: // string - use readString to handle special encodings
 		val, err := readString(r)
 		if err != nil {
-			return "", err
+			return kv.StoreValue{}, err
 		} else {
-			return val, nil
+			return kv.NewStoreValue(kv.StringType, val), nil
 		}
 	default:
-		// Unknown types - skip safely
-		return "", nil
+		return kv.StoreValue{}, nil
 	}
 }

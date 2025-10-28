@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"strings"
 	"sync"
 
@@ -41,7 +42,7 @@ type Server struct {
 }
 
 func NewServer(host string, port int, role string, masterReplId string, masterReplOffset int, replicaof string, dir, dbfilename string) *Server {
-	return &Server{
+	server := &Server{
 		Host:             host,
 		Port:             port,
 		Role:             role,
@@ -53,6 +54,11 @@ func NewServer(host string, port int, role string, masterReplId string, masterRe
 		Dir:              dir,
 		Dbfilename:       dbfilename,
 	}
+	if dir != "" && dbfilename != "" {
+		filepath := path.Join(dir, dbfilename)
+		server.Parse(filepath)
+	}
+	return server
 }
 
 func (s *Server) Run() {

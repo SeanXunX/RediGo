@@ -29,6 +29,10 @@ type StoreValue struct {
 	v any       // val
 }
 
+func NewStoreValue(t ValueType, v any) StoreValue {
+	return StoreValue{t, v}
+}
+
 func NewKVStore() *KVStore {
 	kv := &KVStore{
 		mp:          sync.Map{},
@@ -44,6 +48,10 @@ func (kv *KVStore) store(key string, val any, t ValueType) {
 		v: val,
 	}
 	kv.mp.Store(key, storeV)
+}
+
+func (kv *KVStore) Store(key string, sVal StoreValue) {
+	kv.mp.Store(key, sVal)
 }
 
 func (kv *KVStore) Type(key string) string {
@@ -69,4 +77,13 @@ func (kv *KVStore) Type(key string) string {
 	default:
 		return "none"
 	}
+}
+
+func (kv *KVStore) Keys(query string) []string {
+	keys := []string{}
+	kv.mp.Range(func(k, v any) bool {
+		keys = append(keys, k.(string))
+		return true
+	})
+	return keys
 }
