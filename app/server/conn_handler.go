@@ -7,11 +7,13 @@ import (
 	"io"
 	"log"
 	"net"
+	"path"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
+	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
@@ -176,6 +178,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleWAIT(cmd)
 	case "CONFIG":
 		return h.handleCONFIG(cmd)
+	case "KEYS":
+		return h.handleKEYS(cmd)
 	default:
 		return []byte{}
 	}
@@ -527,4 +531,16 @@ func (h *ConnHandler) handleCONFIG(cmd CMD) []byte {
 		}
 	}
 	return []byte{}
+}
+
+func (h *ConnHandler) handleKEYS(cmd CMD) []byte {
+	query := cmd.Args[0]
+	filePath := path.Join(h.s.Dir, h.s.Dbfilename)
+	switch query {
+	case "*":
+		keys, _ := rdb.ParseKeys(filePath)
+		return resp.EncodeArray(keys)
+	default:
+		return []byte{}
+	}
 }
