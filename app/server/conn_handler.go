@@ -16,8 +16,9 @@ import (
 )
 
 type ConnHandler struct {
-	conn net.Conn
-	in   chan CMD
+	conn   net.Conn
+	reader *bufio.Reader
+	in     chan CMD
 
 	inTransaction bool
 	commandQueue  []CMD
@@ -62,6 +63,18 @@ var subModeCommands = map[string]bool{
 func NewConnHandler(conn net.Conn, s *Server) *ConnHandler {
 	return &ConnHandler{
 		conn:          conn,
+		reader:        bufio.NewReader(conn),
+		in:            make(chan CMD),
+		inTransaction: false,
+		commandQueue:  []CMD{},
+		s:             s,
+	}
+}
+
+func NewConnHandlerWithReader(conn net.Conn, s *Server, reader *bufio.Reader) *ConnHandler {
+	return &ConnHandler{
+		conn:          conn,
+		reader:        reader,
 		in:            make(chan CMD),
 		inTransaction: false,
 		commandQueue:  []CMD{},
@@ -148,7 +161,8 @@ func (h *ConnHandler) propagateCMD(cmd CMD) {
 }
 
 func (h *ConnHandler) readCMD() {
-	reader := bufio.NewReader(h.conn)
+	// reader := bufio.NewReader(h.conn)
+	reader := h.reader
 	for {
 		parts, n, err := resp.DecodeArray(reader)
 		if err == io.EOF {
