@@ -102,16 +102,12 @@ func (kv *KVStore) ZRange(key string, start, end int) (res []string) {
 	if start < 0 {
 		start = length + start
 	}
-	if start < 0 {
-		return
-	}
+	start = max(0, start)
 
 	if end < 0 {
 		end = length + end
 	}
-	if end < 0 {
-		return
-	}
+	end = max(0, end)
 
 	if start >= len(ss) || start > end {
 		return
