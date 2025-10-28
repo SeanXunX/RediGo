@@ -608,12 +608,15 @@ func (h *ConnHandler) handleSUBSCRIBE(cmd CMD) []byte {
 	if !ok {
 		psMan.mu.Lock()
 		psMan.subscribers[h.conn] = NewSubscriber()
-		if _, ok := psMan.channels[chName]; !ok {
-			psMan.channels[chName] = make(map[net.Conn]*Subscriber)
-		}
-		psMan.channels[chName][h.conn] = psMan.subscribers[h.conn]
 		psMan.mu.Unlock()
 	}
+
+	psMan.mu.Lock()
+	if _, ok := psMan.channels[chName]; !ok {
+		psMan.channels[chName] = make(map[net.Conn]*Subscriber)
+	}
+	psMan.channels[chName][h.conn] = psMan.subscribers[h.conn]
+	psMan.mu.Unlock()
 
 	psMan.mu.RLock()
 	sub := psMan.subscribers[h.conn]
