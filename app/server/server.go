@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	// "time"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/kv"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
@@ -199,7 +199,7 @@ func (s *Server) SendHandShake() {
 		}
 	}
 	// 完成后再启动 handler 处理后续命令
-	// time.Sleep(1000 * time.Millisecond) // 如果这样能 100% 成功，说明是竞态问题
+	time.Sleep(1000 * time.Millisecond) // 如果这样能 100% 成功，说明是竞态问题
 	h := NewConnHandler(conn, s)
 	go h.Handle(true)
 }
