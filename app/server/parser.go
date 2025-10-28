@@ -238,7 +238,6 @@ func readValue(r io.Reader, valueType byte, expireAt time.Time) (kv.StoreValue, 
 			} else {
 				px = int(time.Until(expireAt).Milliseconds())
 			}
-			fmt.Printf("[debug] expire time (ms) = %d\n", px)
 			strVal := kv.NewStringValue(val, px)
 			return kv.NewStoreValue(kv.StringType, strVal), nil
 		}

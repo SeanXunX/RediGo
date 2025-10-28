@@ -39,6 +39,43 @@ type Server struct {
 
 	Dir        string
 	Dbfilename string
+
+	PubSub *PubSubManager
+}
+
+// Pub/Sub 管理器
+type PubSubManager struct {
+	mu sync.RWMutex
+
+	// // channel -> subscriber connections
+	// channels map[string]map[net.Conn]*Subscriber
+
+	// // pattern -> subscriber connections
+	// patterns map[string]map[net.Conn]*Subscriber
+
+	// connection -> subscribed channels
+	subscribers map[net.Conn]*Subscriber
+}
+
+type Subscriber struct {
+	mu       sync.RWMutex
+	Channels map[string]bool // 订阅的普通 channel
+	// Patterns map[string]bool // 订阅的 pattern
+	// WriteCh  chan []byte // 异步写入通道，避免阻塞发布者
+}
+
+func NewPubSubManager() *PubSubManager {
+	return &PubSubManager{
+		// channels: make(map[string]map[net.Conn]*Subscriber),
+		// patterns:    make(map[string]map[net.Conn]*Subscriber),
+		subscribers: make(map[net.Conn]*Subscriber),
+	}
+}
+
+func NewSubscriber() *Subscriber {
+	return &Subscriber{
+		Channels: make(map[string]bool),
+	}
 }
 
 func NewServer(host string, port int, role string, masterReplId string, masterReplOffset int, replicaof string, dir, dbfilename string) *Server {
@@ -53,6 +90,7 @@ func NewServer(host string, port int, role string, masterReplId string, masterRe
 		SlaveConns:       []net.Conn{},
 		Dir:              dir,
 		Dbfilename:       dbfilename,
+		PubSub:           NewPubSubManager(),
 	}
 	if dir != "" && dbfilename != "" {
 		filepath := path.Join(dir, dbfilename)

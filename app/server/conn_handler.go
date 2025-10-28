@@ -178,6 +178,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleCONFIG(cmd)
 	case "KEYS":
 		return h.handleKEYS(cmd)
+	case "SUBSCRIBE":
+		return h.handleSUBSCRIBE(cmd)
 	default:
 		return []byte{}
 	}
@@ -535,4 +537,44 @@ func (h *ConnHandler) handleKEYS(cmd CMD) []byte {
 	query := cmd.Args[0]
 	keys := h.s.KVStore.Keys(query)
 	return resp.EncodeArray(keys)
+}
+
+func (h *ConnHandler) handleSUBSCRIBE(cmd CMD) []byte {
+	chName := cmd.Args[0]
+
+	psMan := h.s.PubSub
+
+	psMan.mu.RLock()
+	_, ok := psMan.subscribers[h.conn]
+	psMan.mu.RUnlock()
+
+	if !ok {
+		psMan.mu.Lock()
+		psMan.subscribers[h.conn] = NewSubscriber()
+		psMan.mu.Unlock()
+	}
+
+	psMan.mu.RLock()
+	sub := psMan.subscribers[h.conn]
+	psMan.mu.RUnlock()
+
+	sub.mu.RLock()
+	_, ok = sub.Channels[chName]
+	sub.mu.RUnlock()
+
+	if !ok {
+		sub.mu.Lock()
+		sub.Channels[chName] = true
+		sub.mu.Unlock()
+	}
+
+	sub.mu.RLock()
+	cnt := len(sub.Channels)
+	sub.mu.RUnlock()
+
+	res := fmt.Appendf([]byte{}, "*%d\r\n", 3)
+	res = append(res, resp.EncodeBulkString("subscribe")...)
+	res = append(res, resp.EncodeBulkString(chName)...)
+	res = append(res, resp.EncodeInt(cnt)...)
+	return res
 }

@@ -26,6 +26,7 @@ func EncodeNullBulkString() (res []byte) {
 	return
 }
 
+// All bulkstring array
 func EncodeArray(l []string) (res []byte) {
 	res = fmt.Appendf(res, "*%d\r\n", len(l))
 	for _, str := range l {
