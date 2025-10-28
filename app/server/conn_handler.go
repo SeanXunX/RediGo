@@ -263,6 +263,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleKEYS(cmd)
 	case "SUBSCRIBE":
 		return h.handleSUBSCRIBE(cmd)
+	case "PUBLISH":
+		return h.handlePUBLISH(cmd)
 	default:
 		return []byte{}
 	}
