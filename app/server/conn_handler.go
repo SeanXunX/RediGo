@@ -293,6 +293,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleZSCORE(cmd)
 	case "ZREM":
 		return h.handleZREM(cmd)
+	case "GEOADD":
+		return h.handleGeoAdd(cmd)
 	default:
 		return []byte{}
 	}
