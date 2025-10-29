@@ -297,6 +297,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleGeoAdd(cmd)
 	case "GEOPOS":
 		return h.handleGEOPOS(cmd)
+	case "GEODIST":
+		return h.handleGEODIST(cmd)
 	default:
 		return []byte{}
 	}
@@ -820,4 +822,11 @@ func (h *ConnHandler) handleGEOPOS(cmd CMD) []byte {
 		}
 	}
 	return res
+}
+
+func (h *ConnHandler) handleGEODIST(cmd CMD) []byte {
+	key := cmd.Args[0]
+	m1, m2 := cmd.Args[1], cmd.Args[2]
+	distance := h.s.KVStore.GEODIST(key, m1, m2)
+	return resp.EncodeBulkString(strconv.FormatFloat(distance, 'f', -1, 64))
 }
