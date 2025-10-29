@@ -1,6 +1,19 @@
 # 🚀 RediGo
 
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-seanxunx%2Fredigo-blue?logo=docker)](https://hub.docker.com/r/seanxunx/redigo)
+
 A feature-rich Redis server implementation in Go, built as part of the [CodeCrafters](https://codecrafters.io) Redis challenge. This project implements the Redis Serialization Protocol (RESP) and supports a wide range of Redis commands and features.
+
+## 🎯 Quick Start
+
+```bash
+# Pull and run from Docker Hub
+docker pull seanxunx/redigo:latest
+docker run -p 6379:6379 seanxunx/redigo:latest
+
+# Connect with redis-cli
+redis-cli -h localhost -p 6379
+```
 
 ## ✨ Features
 
@@ -132,11 +145,30 @@ go run ./app/main.go -dir /tmp/redis -dbfilename dump.rdb
 
 ### 🐳 Running with Docker
 
-```bash
-# Build and run with Docker Compose
-docker-compose up -d
+#### Using Pre-built Image from Docker Hub
 
-# Or build and run manually
+```bash
+# Pull the latest image
+docker pull seanxunx/redigo:latest
+
+# Run as master
+docker run -p 6379:6379 seanxunx/redigo:latest
+
+# Run with custom port
+docker run -p 6380:6379 seanxunx/redigo:latest
+
+# Run with volume for RDB persistence
+docker run -p 6379:6379 -v $(pwd)/data:/data \
+  seanxunx/redigo:latest -dir /data -dbfilename dump.rdb
+
+# Using Docker Compose
+docker-compose up -d
+```
+
+#### Building from Source
+
+```bash
+# Build locally
 docker build -t redigo .
 docker run -p 6379:6379 redigo
 ```
@@ -213,8 +245,13 @@ EXEC
 
 The project builds a minimal Docker image using multi-stage builds:
 - **Builder stage**: Compiles the Go application
-- **Runtime stage**: Uses `scratch` for minimal image size
-- **Image**: Available as `seanxunx/redigo:latest`
+- **Runtime stage**: Uses `scratch` for minimal image size (~10MB)
+- **Publicly Available**: [seanxunx/redigo](https://hub.docker.com/r/seanxunx/redigo) on Docker Hub
+
+Pull the image:
+```bash
+docker pull seanxunx/redigo:latest
+```
 
 ## 🛠️ Development
 
