@@ -289,6 +289,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleZRANGE(cmd)
 	case "ZCARD":
 		return h.handleZCARD(cmd)
+	case "ZSCORE":
+		return h.handleZSCORE(cmd)
 	default:
 		return []byte{}
 	}
@@ -763,4 +765,15 @@ func (h *ConnHandler) handleZCARD(cmd CMD) []byte {
 	key := cmd.Args[0]
 	length := h.s.KVStore.ZCard(key)
 	return resp.EncodeInt(length)
+}
+
+func (h *ConnHandler) handleZSCORE(cmd CMD) []byte {
+	key := cmd.Args[0]
+	member := cmd.Args[1]
+	score := h.s.KVStore.ZScore(key, member)
+	if score == nil {
+		return resp.EncodeNullBulkString()
+	} else {
+		return resp.EncodeBulkString(strconv.FormatFloat(score.(float64), 'f', -1, 64))
+	}
 }

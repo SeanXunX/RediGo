@@ -131,3 +131,19 @@ func (kv *KVStore) ZCard(key string) int {
 	}
 	return len(zSet.scores)
 }
+
+// Get member's score. If existing, return float64. Else Return nil.
+func (kv *KVStore) ZScore(key string, member string) any {
+	storeValAny, ok := kv.mp.Load(key)
+	var zSet ZSetValue
+	if !ok {
+		return nil
+	} else {
+		zSet = storeValAny.(StoreValue).v.(ZSetValue)
+	}
+	if score, ok := zSet.memToScore[member]; !ok {
+		return nil
+	} else {
+		return score
+	}
+}
