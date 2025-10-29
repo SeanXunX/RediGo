@@ -147,3 +147,22 @@ func (kv *KVStore) ZScore(key string, member string) any {
 		return score
 	}
 }
+
+func (kv *KVStore) ZRem(key, member string) int {
+	storeValAny, ok := kv.mp.Load(key)
+	var newZSet ZSetValue
+	if !ok {
+		return 0
+	} else {
+		newZSet = storeValAny.(StoreValue).v.(ZSetValue)
+	}
+	if oldScore, ok := newZSet.memToScore[member]; !ok {
+		return 0
+	} else {
+		delete(newZSet.memToScore, member)
+		pos := LowerBound(newZSet.scores, ZSetElem{member, oldScore})
+		newZSet.scores = append(newZSet.scores[:pos], newZSet.scores[pos+1:]...)
+		kv.store(key, newZSet, ZSetType)
+		return 1
+	}
+}

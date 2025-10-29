@@ -291,6 +291,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleZCARD(cmd)
 	case "ZSCORE":
 		return h.handleZSCORE(cmd)
+	case "ZREM":
+		return h.handleZREM(cmd)
 	default:
 		return []byte{}
 	}
@@ -776,4 +778,11 @@ func (h *ConnHandler) handleZSCORE(cmd CMD) []byte {
 	} else {
 		return resp.EncodeBulkString(strconv.FormatFloat(score.(float64), 'f', -1, 64))
 	}
+}
+
+func (h *ConnHandler) handleZREM(cmd CMD) []byte {
+	key := cmd.Args[0]
+	member := cmd.Args[1]
+	rmNum := h.s.KVStore.ZRem(key, member)
+	return resp.EncodeInt(rmNum)
 }
