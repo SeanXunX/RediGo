@@ -808,15 +808,20 @@ func (h *ConnHandler) handleGEOPOS(cmd CMD) []byte {
 	key := cmd.Args[0]
 	members := cmd.Args[1:]
 	res := fmt.Appendf([]byte{}, "*%d\r\n", len(members))
+	isExist := false
 	for _, member := range members {
 		longitude, latitude, err := h.s.KVStore.GEOPOS(key, member)
 		if err != nil {
 			res = append(res, resp.EncodeNullArray()...)
 		}
+		isExist = true
 		res = append(res, resp.EncodeArray([]string{
 			strconv.FormatFloat(longitude, 'f', -1, 64),
 			strconv.FormatFloat(latitude, 'f', -1, 64),
 		})...)
+	}
+	if !isExist {
+		return resp.EncodeNullArray()
 	}
 	return res
 }
