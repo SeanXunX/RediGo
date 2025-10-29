@@ -786,3 +786,16 @@ func (h *ConnHandler) handleZREM(cmd CMD) []byte {
 	rmNum := h.s.KVStore.ZRem(key, member)
 	return resp.EncodeInt(rmNum)
 }
+
+func (h *ConnHandler) handleGeoAdd(cmd CMD) []byte {
+	key := cmd.Args[0]
+	longitude, _ := strconv.ParseFloat(cmd.Args[1], 64)
+	latitude, _ := strconv.ParseFloat(cmd.Args[2], 64)
+	member := cmd.Args[3]
+
+	num, err := h.s.KVStore.GEOADD(key, member, longitude, latitude)
+	if err != nil {
+		return resp.EncodeSimpleError(fmt.Sprintf("invalid longitude,latitude pair %f,%f", longitude, latitude))
+	}
+	return resp.EncodeInt(num)
+}
