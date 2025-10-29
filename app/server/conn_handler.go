@@ -806,13 +806,17 @@ func (h *ConnHandler) handleGeoAdd(cmd CMD) []byte {
 
 func (h *ConnHandler) handleGEOPOS(cmd CMD) []byte {
 	key := cmd.Args[0]
-	member := cmd.Args[1]
-	longitude, latitude, err := h.s.KVStore.GEOPOS(key, member)
-	if err != nil {
-		return resp.EncodeNullArray()
+	members := cmd.Args[1:]
+	res := fmt.Appendf([]byte{}, "*%d\r\n", len(members))
+	for _, member := range members {
+		longitude, latitude, err := h.s.KVStore.GEOPOS(key, member)
+		if err != nil {
+			res = append(res, resp.EncodeNullArray()...)
+		}
+		res = append(res, resp.EncodeArray([]string{
+			strconv.FormatFloat(longitude, 'f', -1, 64),
+			strconv.FormatFloat(latitude, 'f', -1, 64),
+		})...)
 	}
-	return resp.EncodeArray([]string{
-		strconv.FormatFloat(longitude, 'f', -1, 64),
-		strconv.FormatFloat(latitude, 'f', -1, 64),
-	})
+	return res
 }
