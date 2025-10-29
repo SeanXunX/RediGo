@@ -43,3 +43,25 @@ func (kv *KVStore) GEODIST(key string, m1, m2 string) float64 {
 
 	return geospatial.Distance(p1, p2)
 }
+
+// Search for locations within given radius (meters)
+func (kv *KVStore) GEOSEARCH_FROMLONLAT_BYRADIUS(key string, lon, lat float64, radius float64) (res []string) {
+	storeValAny, ok := kv.mp.Load(key)
+	var zSet ZSetValue
+	if !ok {
+		return
+	} else {
+		zSet = storeValAny.(StoreValue).v.(ZSetValue)
+	}
+
+	tarPoint := geospatial.NewPoint(lon, lat)
+	for _, elem := range zSet.scores {
+		curLon, curLat := geospatial.GeohashDecode(elem.score)
+		p := geospatial.NewPoint(curLon, curLat)
+		if geospatial.Distance(p, tarPoint) <= radius {
+			res = append(res, elem.member)
+		}
+	}
+
+	return
+}

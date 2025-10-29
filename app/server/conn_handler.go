@@ -299,6 +299,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleGEOPOS(cmd)
 	case "GEODIST":
 		return h.handleGEODIST(cmd)
+	case "GEOSEARCH":
+		return h.hendleGEOSEARCH(cmd)
 	default:
 		return []byte{}
 	}
@@ -829,4 +831,23 @@ func (h *ConnHandler) handleGEODIST(cmd CMD) []byte {
 	m1, m2 := cmd.Args[1], cmd.Args[2]
 	distance := h.s.KVStore.GEODIST(key, m1, m2)
 	return resp.EncodeBulkString(strconv.FormatFloat(distance, 'f', -1, 64))
+}
+
+func (h *ConnHandler) hendleGEOSEARCH(cmd CMD) []byte {
+	key := cmd.Args[0]
+
+	longitude, _ := strconv.ParseFloat(cmd.Args[2], 64)
+	latitude, _ := strconv.ParseFloat(cmd.Args[3], 64)
+	radius, _ := strconv.ParseFloat(cmd.Args[5], 64)
+
+	switch cmd.Args[6] {
+	case "km":
+		radius *= 1000
+	case "mi":
+		radius *= 1609
+	}
+
+	locations := h.s.KVStore.GEOSEARCH_FROMLONLAT_BYRADIUS(key, longitude, latitude, radius)
+
+	return resp.EncodeArray(locations)
 }
