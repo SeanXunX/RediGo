@@ -14,7 +14,7 @@ func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
 
-	host := "localhost"
+	host := "0.0.0.0"
 
 	port := flag.Int("port", 6379, "server port")
 	replicaof := flag.String("replicaof", "", "replication of")

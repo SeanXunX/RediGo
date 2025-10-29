@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: seanxunx/redigo:latest
+    container_name: RediGo
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
