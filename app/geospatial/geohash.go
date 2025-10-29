@@ -73,9 +73,9 @@ func isValid(longitude, latitude float64) bool {
 	return true
 }
 
-func GeohashEncode(longitude, latitude float64) (float64, error) {
+func GeohashEncode(longitude, latitude float64) (uint64, error) {
 	if !isValid(longitude, latitude) {
-		return -1, fmt.Errorf("Invalid (longitude, latitude): Out of range.")
+		return 0, fmt.Errorf("Invalid (longitude, latitude): Out of range.")
 	}
 
 	var lonBit, latBit uint
@@ -84,7 +84,7 @@ func GeohashEncode(longitude, latitude float64) (float64, error) {
 	lonRange := []float64{GEO_LONG_MIN, GEO_LONG_MAX}
 	latRange := []float64{GEO_LAT_MIN, GEO_LAT_MAX}
 
-	for range GEO_STEP_MAX {
+	for i := 0; i < GEO_STEP_MAX; i++ {
 		lonMid := (lonRange[0] + lonRange[1]) / 2
 		if longitude >= lonMid {
 			lonBit = 1
@@ -109,6 +109,35 @@ func GeohashEncode(longitude, latitude float64) (float64, error) {
 		hash |= uint64(latBit)
 	}
 
-	return float64(hash), nil
+	return hash, nil
+}
+
+func GeohashDecode(hashF64 float64) (longitude, latitude float64) {
+	hash := uint64(hashF64)
+
+	lonRange := []float64{GEO_LONG_MIN, GEO_LONG_MAX}
+	latRange := []float64{GEO_LAT_MIN, GEO_LAT_MAX}
+
+	for i := range GEO_STEP_MAX {
+		lonBit := (hash >> (51 - (i * 2))) & 1
+		latBit := (hash >> (50 - (i * 2))) & 1
+
+		if lonBit == 1 {
+			lonRange[0] = (lonRange[0] + lonRange[1]) / 2
+		} else {
+			lonRange[1] = (lonRange[0] + lonRange[1]) / 2
+		}
+
+		if latBit == 1 {
+			latRange[0] = (latRange[0] + latRange[1]) / 2
+		} else {
+			latRange[1] = (latRange[0] + latRange[1]) / 2
+		}
+	}
+
+	longitude = (lonRange[0] + lonRange[1]) / 2
+	latitude = (latRange[0] + latRange[1]) / 2
+
+	return
 }
 

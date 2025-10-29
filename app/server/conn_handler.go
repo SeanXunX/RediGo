@@ -295,6 +295,8 @@ func (h *ConnHandler) run(cmd CMD) []byte {
 		return h.handleZREM(cmd)
 	case "GEOADD":
 		return h.handleGeoAdd(cmd)
+	case "GEOPOS":
+		return h.handleGEOPOS(cmd)
 	default:
 		return []byte{}
 	}
@@ -800,4 +802,17 @@ func (h *ConnHandler) handleGeoAdd(cmd CMD) []byte {
 		return resp.EncodeSimpleError(fmt.Sprintf("invalid longitude,latitude pair %f,%f", longitude, latitude))
 	}
 	return resp.EncodeInt(num)
+}
+
+func (h *ConnHandler) handleGEOPOS(cmd CMD) []byte {
+	key := cmd.Args[0]
+	member := cmd.Args[1]
+	longitude, latitude, err := h.s.KVStore.GEOPOS(key, member)
+	if err != nil {
+		return resp.EncodeNullArray()
+	}
+	return resp.EncodeArray([]string{
+		strconv.FormatFloat(longitude, 'f', -1, 64),
+		strconv.FormatFloat(latitude, 'f', -1, 64),
+	})
 }
